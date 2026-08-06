@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ระบบจัดการใบสมัครและรีวิวเรซูเม่สำหรับทีมสรรหาบุคลากร">
+  <title>SectionCV — Resume Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="SectionCV หน้าหลัก"><span class="brand-mark">S</span><span>Section<span>CV</span></span></a>
+      <nav aria-label="เมนูหลัก">
+        <a class="nav-item active" href="#"><span>▦</span> ผู้สมัครทั้งหมด <b id="navCount">6</b></a>
+        <a class="nav-item" href="#"><span>☆</span> รายการโปรด</a>
+        <a class="nav-item" href="#"><span>◷</span> รอพิจารณา</a>
+        <a class="nav-item" href="#"><span>✓</span> ผ่านการคัดเลือก</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <button class="nav-item button-reset" id="importOpen"><span>⇧</span> นำเข้าข้อมูล</button>
+        <a class="nav-item" href="#"><span>⚙</span> ตั้งค่า</a>
+        <div class="user-card"><div class="avatar small">NP</div><div><strong>นันทิยา พรหมดี</strong><small>Talent Acquisition</small></div><button aria-label="เมนูผู้ใช้">⋯</button></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div><p class="eyebrow">RESUME WORKSPACE</p><h1>ผู้สมัครทั้งหมด</h1><p class="subtitle">จัดการ ตรวจสอบ และทำงานร่วมกับทีมได้ในที่เดียว</p></div>
+        <div class="header-actions"><button class="icon-btn" aria-label="การแจ้งเตือน">♢<i></i></button><button class="primary-btn" id="importTop">＋ นำเข้าผู้สมัคร</button></div>
+      </header>
+
+      <section class="stats" aria-label="สถิติผู้สมัคร">
+        <article><div class="stat-icon blue">♙</div><div><span>ผู้สมัครทั้งหมด</span><strong id="totalCount">6</strong><small class="positive">↗ 12% จากสัปดาห์ก่อน</small></div></article>
+        <article><div class="stat-icon amber">◷</div><div><span>รอพิจารณา</span><strong id="pendingCount">3</strong><small>อัปเดตล่าสุดวันนี้</small></div></article>
+        <article><div class="stat-icon green">✓</div><div><span>ผ่านการคัดเลือก</span><strong>2</strong><small class="positive">อัตราผ่าน 33%</small></div></article>
+        <article><div class="stat-icon purple">▤</div><div><span>ความคิดเห็น</span><strong id="commentCount">8</strong><small>จากทีมสรรหา</small></div></article>
+      </section>
+
+      <section class="workspace">
+        <div class="toolbar">
+          <label class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="ค้นหาชื่อ อีเมล หรือตำแหน่ง..." aria-label="ค้นหาผู้สมัคร"></label>
+          <div class="filters"><select id="branchFilter" aria-label="กรองสาขา"><option value="">ทุกสาขา</option></select><select id="statusFilter" aria-label="กรองสถานะ"><option value="">ทุกสถานะ</option><option>รอพิจารณา</option><option>ผ่านการคัดเลือก</option><option>นัดสัมภาษณ์</option></select><button class="view-btn active" id="gridView" aria-label="มุมมองการ์ด">▦</button><button class="view-btn" id="listView" aria-label="มุมมองรายการ">☷</button></div>
+        </div>
+        <div class="result-meta"><span>แสดง <b id="resultCount">6</b> ผู้สมัคร</span><button class="sort-btn">เรียงตาม: <b>ล่าสุด</b>⌄</button></div>
+        <div class="candidate-grid" id="candidateGrid"></div>
+        <div class="empty-state" id="emptyState" hidden><span>⌕</span><h3>ไม่พบผู้สมัคร</h3><p>ลองเปลี่ยนคำค้นหาหรือตัวกรองของคุณ</p></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="drawer-overlay" id="drawerOverlay" hidden></div>
+  <aside class="resume-drawer" id="resumeDrawer" aria-hidden="true"><button class="drawer-close" id="drawerClose" aria-label="ปิด">×</button><div id="resumeContent"></div></aside>
+
+  <dialog id="importDialog">
+    <form method="dialog" class="modal-card">
+      <div class="modal-head"><div><p class="eyebrow">IMPORT DATA</p><h2>นำเข้าข้อมูลผู้สมัคร</h2></div><button class="modal-close" value="cancel" aria-label="ปิด">×</button></div>
+      <p class="modal-help">วางข้อมูลจาก Google Sheets หรือไฟล์ TSV โดยเรียงคอลัมน์: ประทับเวลา, ชื่อ, วันเกิด, อีเมล, โทรศัพท์, LINE ID, ที่อยู่, Resume และตำแหน่ง</p>
+      <textarea id="importData" placeholder="วางข้อมูลตารางที่นี่..."></textarea>
+      <div class="modal-actions"><button class="secondary-btn" value="cancel">ยกเลิก</button><button class="primary-btn" type="button" id="importConfirm">นำเข้าข้อมูล</button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status">นำเข้าข้อมูลเรียบร้อยแล้ว</div>
+  <script src="app.js"></script>
+</body>
+</html>
