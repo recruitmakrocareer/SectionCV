@@ -1,7 +1,10 @@
 #!/usr/bin/env sh
 set -eu
-
 cd "$(dirname "$0")"
-echo "Makro game: http://localhost:8000"
-echo "Keep this terminal open while playing. Press Ctrl+C to stop."
-python3 -m http.server 8000
+if command -v open >/dev/null 2>&1; then
+  open index.html
+elif command -v xdg-open >/dev/null 2>&1; then
+  xdg-open index.html
+else
+  printf 'Open this file in your browser:\n%s/index.html\n' "$PWD"
+fi

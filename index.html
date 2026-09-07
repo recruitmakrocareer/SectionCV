@@ -2,13 +2,13 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="เกมจับผิดภาพ สนุกกับภารกิจตามหาจุดต่างในมาคโคร">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="เกมจับผิดภาพ สนุกกับภารกิจตามหาจุดต่างในแม็คโคร">
   <title>MAKRO — เกมจับผิดภาพ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260907-2">
 </head>
 <body>
   <header class="site-header">
@@ -16,7 +16,6 @@
     <nav aria-label="เมนูหลัก">
       <a class="active" href="#game">หน้าแรก</a>
       <a href="#howto">วิธีเล่น</a>
-      <a href="#rewards">ของรางวัล</a>
     </nav>
     <button class="sound-button" id="soundToggle" aria-label="เปิดหรือปิดเสียง" aria-pressed="false">
       <span id="soundIcon">♪</span><span class="sound-label">เสียง</span>
@@ -30,22 +29,27 @@
       <h1>เกม<span>จับผิดภาพ</span></h1>
       <p class="hero-copy">จับตาให้ดี แล้วค้นหา 5 จุดที่แตกต่างกัน<br>ในภาพบรรยากาศสุดคึกคักที่แม็คโคร</p>
       <div class="game-stats">
-        <div class="stat"><span class="stat-icon clock-icon">◷</span><div><small>เวลาที่เหลือ</small><strong id="timer">02:00</strong></div></div>
+        <div class="stat"><span class="stat-icon clock-icon">◷</span><div><small>เวลาที่เหลือ</small><strong id="timer" role="timer" aria-label="เวลาที่เหลือ">02:00</strong></div></div>
         <div class="divider"></div>
         <div class="stat"><span class="stat-icon target-icon">◎</span><div><small>พบแล้ว</small><strong><span id="foundCount">0</span><em>/5 จุด</em></strong></div></div>
       </div>
     </section>
 
     <section class="game-card" aria-label="เกมจับผิดภาพ">
+      <div class="play-controls">
+        <p id="gameStatus" role="status">พร้อมแล้วแตะเริ่มเกม · หาให้ครบ 5 จุดใน 2 นาที</p>
+        <div class="control-buttons"><button id="startButton" type="button" class="primary-button">เริ่มเกม</button><button id="restartButton" type="button" class="secondary-button" disabled>เริ่มใหม่</button></div>
+      </div>
+      <noscript><p class="no-script">กรุณาเปิด JavaScript ในเบราว์เซอร์เพื่อเล่นเกมนี้</p></noscript>
       <div class="card-top">
         <div><span class="level-pill">ด่านที่ 1</span><h2>ช้อปสนุกที่แม็คโคร</h2></div>
-        <div class="progress-wrap"><div class="progress-info"><span>ความคืบหน้า</span><b id="progressText">0%</b></div><div class="progress"><i id="progressBar"></i></div></div>
+        <div class="progress-wrap"><div class="progress-info"><span>ความคืบหน้า</span><b id="progressText">0%</b></div><div class="progress" id="gameProgress" role="progressbar" aria-label="จุดต่างที่พบ" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><i id="progressBar"></i></div></div>
       </div>
 
-      <div class="pictures">
+      <div class="pictures" data-state="ready">
         <article class="picture-panel">
           <span class="picture-label">ภาพต้นฉบับ</span>
-          <div class="scene-wrap" data-scene="original">
+          <div class="scene-wrap" data-scene="original" aria-label="ภาพต้นฉบับ แตะเพื่อเลือกจุดแตกต่าง">
             <svg class="scene" viewBox="0 0 700 430" role="img" aria-label="ภาพต้นฉบับร้านแม็คโคร">
               <defs><linearGradient id="wallA" x2="0" y2="1"><stop stop-color="#fff9e8"/><stop offset="1" stop-color="#f8e9bb"/></linearGradient><linearGradient id="floorA" x2="0" y2="1"><stop stop-color="#ead9aa"/><stop offset="1" stop-color="#d5bd82"/></linearGradient></defs>
               <rect width="700" height="430" fill="url(#wallA)"/><rect y="315" width="700" height="115" fill="url(#floorA)"/>
@@ -66,7 +70,7 @@
 
         <article class="picture-panel">
           <span class="picture-label different">ภาพที่แตกต่าง</span>
-          <div class="scene-wrap playable" id="playScene" data-scene="different">
+          <div class="scene-wrap playable" id="playScene" data-scene="different" aria-label="ภาพที่แตกต่าง แตะเพื่อเลือกจุดแตกต่าง">
             <svg class="scene" viewBox="0 0 700 430" role="img" aria-label="ภาพร้านแม็คโครที่มีจุดแตกต่าง 5 จุด">
               <defs><linearGradient id="wallB" x2="0" y2="1"><stop stop-color="#fff9e8"/><stop offset="1" stop-color="#f8e9bb"/></linearGradient><linearGradient id="floorB" x2="0" y2="1"><stop stop-color="#ead9aa"/><stop offset="1" stop-color="#d5bd82"/></linearGradient></defs>
               <rect width="700" height="430" fill="url(#wallB)"/><rect y="315" width="700" height="115" fill="url(#floorB)"/><path d="M0 350H700M0 397H700M100 315l-28 115M260 315l-10 115M440 315l10 115M600 315l28 115" stroke="#c5a76a" stroke-width="2" opacity=".55"/>
@@ -77,33 +81,33 @@
               <g><path d="M535 74h115v74H535z" fill="#cf1727"/><text x="592" y="101" fill="white" font-family="Kanit" font-size="14" font-weight="700" text-anchor="middle">ราคาพิเศษ</text><text x="592" y="134" fill="#ffe249" font-family="Kanit" font-size="29" font-weight="800" text-anchor="middle">89.-</text><path d="M592 148v52" stroke="#795c33" stroke-width="6"/></g>
               <g><circle cx="534" cy="227" r="25" fill="#ffd0a3"/><path d="M510 221q5-36 43-15l6 24-13-8-35 8z" fill="#382b24"/><rect x="501" y="251" width="69" height="84" rx="22" fill="#263e88"/><path d="M514 274h44" stroke="white" stroke-width="5"/><path d="M514 332l-8 71M556 332l14 71" stroke="#263e69" stroke-width="16"/><path d="M507 275l-42 37M562 275l32 37" stroke="#ffd0a3" stroke-width="13" stroke-linecap="round"/></g>
               <g><path d="M392 294h88l-13 62h-61z" fill="#ddd" stroke="#777" stroke-width="5"/><path d="M393 294l-12-24h-19" fill="none" stroke="#555" stroke-width="6" stroke-linecap="round"/><path d="M402 310h70M401 327h67M418 296l-3 57M441 296v58M462 297l-5 56" stroke="#999" stroke-width="3"/><circle cx="414" cy="370" r="9" fill="#333"/><circle cx="460" cy="370" r="9" fill="#333"/><rect x="409" y="278" width="25" height="23" fill="#efc632"/></g>
-              <g><rect x="602" y="274" width="70" height="47" fill="#d89d4b" stroke="#a87535" stroke-width="3"/><path d="M637 274v47" stroke="#a87535" stroke-width="3"/><rect x="616" y="321" width="70" height="49" fill="#ca8c3e" stroke="#9c692b" stroke-width="3"/></g>
+              <g><rect x="602" y="274" width="70" height="47" fill="#d89d4b" stroke="#a87535" stroke-width="3"/><path d="M637 274v47" stroke="#a87535" stroke-width="3"/><rect x="616" y="321" width="70" height="49" fill="#ca8c3e" stroke="#9c692b" stroke-width="3"/><path d="M651 321v49" stroke="#9c692b" stroke-width="3"/></g>
             </svg>
-            <button class="hotspot" data-id="fruit" style="--x:20.5%;--y:44%;--size:12%" aria-label="จุดแตกต่างที่ผลไม้"></button>
-            <button class="hotspot" data-id="shelf" style="--x:63.5%;--y:37%;--size:13%" aria-label="จุดแตกต่างที่ชั้นสินค้า"></button>
-            <button class="hotspot" data-id="price" style="--x:84.7%;--y:25%;--size:14%" aria-label="จุดแตกต่างที่ป้ายราคา"></button>
-            <button class="hotspot" data-id="shirt" style="--x:76.2%;--y:68%;--size:15%" aria-label="จุดแตกต่างที่เสื้อพนักงาน"></button>
-            <button class="hotspot" data-id="cart" style="--x:64.5%;--y:70%;--size:14%" aria-label="จุดแตกต่างที่รถเข็น"></button>
+            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="fruit" style="--x:20.5%;--y:44%;--size:12%" aria-label="จุดแตกต่างที่ผลไม้"></button>
+            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="shelf" style="--x:63.6%;--y:37.8%;--size:12%" aria-label="จุดแตกต่างที่ชั้นสินค้า"></button>
+            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="price" style="--x:84.6%;--y:28.5%;--size:14%" aria-label="จุดแตกต่างที่ป้ายราคา"></button>
+            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="shirt" style="--x:76.5%;--y:68%;--size:13%" aria-label="จุดแตกต่างที่เสื้อพนักงาน"></button>
+            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="cart" style="--x:64.4%;--y:66.5%;--size:10%" aria-label="จุดแตกต่างที่รถเข็น"></button>
           </div>
         </article>
       </div>
-      <div class="game-actions"><p><span>💡</span> คลิกบริเวณที่คุณคิดว่าแตกต่างในภาพด้านขวา</p><button id="hintButton"><span>◎</span> ใช้คำใบ้ <b id="hintCount">2</b></button></div>
+      <div class="game-actions"><p><span>💡</span> แตะจุดต่างได้ทั้งสองภาพ</p><button id="hintButton" type="button" disabled><span>◎</span> ใช้คำใบ้ <b id="hintCount">2</b></button></div>
     </section>
 
     <section class="how-to" id="howto">
       <p class="section-kicker">HOW TO PLAY</p><h2>วิธีเล่นง่าย ๆ</h2>
-      <div class="steps"><article><b>1</b><span>👀</span><h3>สังเกตภาพ</h3><p>เปรียบเทียบภาพทั้งสองด้าน<br>อย่างละเอียด</p></article><i></i><article><b>2</b><span>☝️</span><h3>คลิกจุดต่าง</h3><p>เจอแล้วคลิกที่ตำแหน่ง<br>ในภาพด้านขวา</p></article><i></i><article><b>3</b><span>🎉</span><h3>ค้นหาให้ครบ</h3><p>ตามหาให้ครบทั้ง 5 จุด<br>ก่อนหมดเวลา</p></article></div>
+      <div class="steps"><article><b>1</b><span>👀</span><h3>สังเกตภาพ</h3><p>เปรียบเทียบภาพทั้งสองด้าน<br>อย่างละเอียด</p></article><i></i><article><b>2</b><span>☝️</span><h3>แตะจุดต่าง</h3><p>เจอแล้วแตะที่ตำแหน่ง<br>ในภาพใดก็ได้</p></article><i></i><article><b>3</b><span>🎉</span><h3>ค้นหาให้ครบ</h3><p>ตามหาให้ครบทั้ง 5 จุด<br>ก่อนหมดเวลา</p></article></div>
     </section>
   </main>
 
-  <footer id="rewards"><a class="logo footer-logo" href="#">makro<span>.</span></a><p>สนุกทุกช้อป คุ้มทุกวัน ที่แม็คโคร</p><small>© 2026 Siam Makro Public Company Limited.</small></footer>
+  <footer><a class="logo footer-logo" href="#">makro<span>.</span></a><p>สนุกทุกช้อป คุ้มทุกวัน ที่แม็คโคร</p><small>Makro · เกมจับผิดภาพ</small></footer>
 
   <div class="modal" id="resultModal" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
-      <div class="trophy">🏆</div><p class="section-kicker">MISSION COMPLETE</p><h2 id="resultTitle">เก่งมาก! คุณเจอครบแล้ว</h2><p id="resultMessage">คุณตามหาจุดแตกต่างครบทั้ง 5 จุดได้สำเร็จ</p><button id="playAgain">เล่นอีกครั้ง</button>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultMessage">
+      <div class="trophy" id="resultIcon" aria-hidden="true">🏆</div><p class="section-kicker" id="resultLabel">พบครบแล้ว!</p><h2 id="resultTitle">เก่งมาก! คุณเจอครบแล้ว</h2><p id="resultMessage">คุณตามหาจุดแตกต่างครบทั้ง 5 จุดได้สำเร็จ</p><div class="result-actions"><button id="playAgain" type="button">เล่นอีกครั้ง</button><button id="closeResult" type="button" class="secondary-button">กลับไปดูภาพ</button></div>
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260907-2"></script>
 </body>
 </html>
