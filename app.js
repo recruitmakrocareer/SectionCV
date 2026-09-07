@@ -1,21 +1,117 @@
-const candidates = [
-  {name:'วีระโชติ พึ่งมานัส',initials:'วพ',date:'6 ส.ค. 2026',email:'boyboy21959@gmail.com',phone:'0821471742',line:'260125281105',address:'จ.นครพนม',branch:'ขอนแก่น',role:'ผู้ช่วยผู้จัดการสาขา',status:'รอพิจารณา',comments:1},
-  {name:'ยุทธถรณ์ สุขสงวน',initials:'ยส',date:'6 ส.ค. 2026',email:'Syuth2827@gmail.com',phone:'093-645-7827',line:'093-645-7827',address:'จ.สมุทรปราการ',branch:'บางพลี',role:'Fresh Manager',status:'นัดสัมภาษณ์',resume:'https://drive.google.com',comments:2},
-  {name:'อรอุมา เกิดอนุ',initials:'อก',date:'6 ส.ค. 2026',email:'nueng.onuma24@gmail.com',phone:'0885062726',line:'0885062726',address:'จ.สุราษฎร์ธานี',branch:'ละไม',role:'Section Manager - Bakery',status:'ผ่านการคัดเลือก',resume:'https://drive.google.com',comments:2},
-  {name:'ศศินันท์ พิชัยช่วง',initials:'ศพ',date:'6 ส.ค. 2026',email:'Sasinan643@gmail.com',phone:'0829251916',line:'Sasinan2525',address:'จ.ขอนแก่น',branch:'ขอนแก่น',role:'ผู้ช่วยผู้จัดการสาขา',status:'รอพิจารณา',resume:'https://drive.google.com',comments:0},
-  {name:'มุจจรินทร์ สุกุมลนันทน์',initials:'มส',date:'6 ส.ค. 2026',email:'aum***@gmail.com',phone:'099***6121',line:'Brio1801',address:'จ.อุดรธานี',branch:'อุดรธานี',role:'Manager - Key Account',status:'ผ่านการคัดเลือก',resume:'https://drive.google.com',comments:2},
-  {name:'พัชรประภา พรหมพันธ์ใจ',initials:'พพ',date:'6 ส.ค. 2026',email:'patcha***@gmail.com',phone:'094***9796',line:'0885617749',address:'จ.ขอนแก่น',branch:'ขอนแก่น',role:'ผู้ช่วยผู้จัดการสาขา',status:'รอพิจารณา',resume:'https://drive.google.com',comments:1}
-];
-const grid=document.querySelector('#candidateGrid'), search=document.querySelector('#searchInput'), branchFilter=document.querySelector('#branchFilter'), statusFilter=document.querySelector('#statusFilter');
-const statusClass=s=>s==='ผ่านการคัดเลือก'?'pass':s==='นัดสัมภาษณ์'?'interview':'pending';
-function escapeHTML(value=''){const node=document.createElement('div');node.textContent=value;return node.innerHTML}
-function updateBranches(){const current=branchFilter.value;[...new Set(candidates.map(c=>c.branch))].sort().forEach(b=>{if(![...branchFilter.options].some(o=>o.value===b))branchFilter.add(new Option(b,b))});branchFilter.value=current}
-function card(c,i){return `<article class="candidate-card" data-index="${i}" tabindex="0"><div class="candidate-head"><div class="avatar">${escapeHTML(c.initials)}</div><div><h3>${escapeHTML(c.name)}</h3><p>${escapeHTML(c.role)}</p></div><button class="more" aria-label="เมนู">⋯</button></div><span class="tag ${statusClass(c.status)}">●&nbsp; ${escapeHTML(c.status)}</span><div class="candidate-info"><span><i>⌂</i>${escapeHTML(c.branch)}</span><span><i>✉</i>${escapeHTML(c.email)}</span><span><i>⌕</i>${escapeHTML(c.phone)}</span></div><div class="candidate-foot"><span>สมัครเมื่อ ${escapeHTML(c.date)}</span><span class="comment-pill">▢ ${c.comments} ความคิดเห็น</span></div></article>`}
-function render(){const q=search.value.trim().toLowerCase();const filtered=candidates.map((c,i)=>({...c,_i:i})).filter(c=>(!q||`${c.name} ${c.email} ${c.role}`.toLowerCase().includes(q))&&(!branchFilter.value||c.branch===branchFilter.value)&&(!statusFilter.value||c.status===statusFilter.value));grid.innerHTML=filtered.map(c=>card(c,c._i)).join('');document.querySelector('#resultCount').textContent=filtered.length;document.querySelector('#emptyState').hidden=filtered.length!==0;document.querySelector('#totalCount').textContent=candidates.length;document.querySelector('#navCount').textContent=candidates.length;document.querySelector('#pendingCount').textContent=candidates.filter(c=>c.status==='รอพิจารณา').length;bindCards()}
-function bindCards(){document.querySelectorAll('.candidate-card').forEach(el=>{const open=()=>openDrawer(candidates[+el.dataset.index]);el.onclick=open;el.onkeydown=e=>{if(e.key==='Enter')open()}})}
-function openDrawer(c){const content=document.querySelector('#resumeContent');content.innerHTML=`<div class="resume-header"><div class="avatar">${escapeHTML(c.initials)}</div><h2>${escapeHTML(c.name)}</h2><p>${escapeHTML(c.role)} · ${escapeHTML(c.branch)}</p><span class="tag ${statusClass(c.status)}">●&nbsp; ${escapeHTML(c.status)}</span></div><section class="resume-section"><h4>ข้อมูลติดต่อ</h4><div class="detail-grid"><div><span>อีเมล</span><p>${escapeHTML(c.email)}</p></div><div><span>โทรศัพท์</span><p>${escapeHTML(c.phone)}</p></div><div><span>LINE ID</span><p>${escapeHTML(c.line)}</p></div><div><span>ที่อยู่</span><p>${escapeHTML(c.address)}</p></div></div></section><section class="resume-section"><h4>เอกสารประกอบ</h4><a class="resume-link" href="${c.resume||'#'}" target="_blank" rel="noopener">▤ ${c.resume?'เปิด Resume ต้นฉบับ':'ยังไม่มี Resume แนบมา'}</a></section><section class="comments"><h3>ความคิดเห็น (${c.comments})</h3><div id="commentList">${c.comments?`<div class="comment"><time>วันนี้ 10:42</time><strong>นันทิยา พรหมดี</strong>ประสบการณ์ตรงกับตำแหน่ง แนะนำให้ติดต่อเพื่อนัดสัมภาษณ์</div>`:'<p class="subtitle">ยังไม่มีความคิดเห็น เป็นคนแรกที่แสดงความคิดเห็น</p>'}</div><form class="comment-form" id="commentForm"><input placeholder="เขียนความคิดเห็น..." required><button>ส่ง</button></form></section>`;document.querySelector('#resumeDrawer').classList.add('open');document.querySelector('#resumeDrawer').setAttribute('aria-hidden','false');document.querySelector('#drawerOverlay').hidden=false;document.querySelector('#commentForm').onsubmit=e=>{e.preventDefault();const input=e.target.querySelector('input');document.querySelector('#commentList').insertAdjacentHTML('beforeend',`<div class="comment"><time>เมื่อสักครู่</time><strong>นันทิยา พรหมดี</strong>${escapeHTML(input.value)}</div>`);input.value='';c.comments++;document.querySelector('#commentCount').textContent=candidates.reduce((n,x)=>n+x.comments,0);render()}}
-function closeDrawer(){document.querySelector('#resumeDrawer').classList.remove('open');document.querySelector('#resumeDrawer').setAttribute('aria-hidden','true');document.querySelector('#drawerOverlay').hidden=true}
-[search,branchFilter,statusFilter].forEach(el=>el.addEventListener('input',render));document.querySelector('#gridView').onclick=()=>{grid.classList.remove('list-mode');document.querySelector('#gridView').classList.add('active');document.querySelector('#listView').classList.remove('active')};document.querySelector('#listView').onclick=()=>{grid.classList.add('list-mode');document.querySelector('#listView').classList.add('active');document.querySelector('#gridView').classList.remove('active')};document.querySelector('#drawerClose').onclick=closeDrawer;document.querySelector('#drawerOverlay').onclick=closeDrawer;
-const dialog=document.querySelector('#importDialog');document.querySelectorAll('#importOpen,#importTop').forEach(b=>b.onclick=()=>dialog.showModal());document.querySelector('#importConfirm').onclick=()=>{const rows=document.querySelector('#importData').value.trim().split(/\n(?=\d{1,2}\/\d{1,2}\/\d{4})/).filter(Boolean);let added=0;rows.forEach(row=>{const p=row.split('\t');if(p.length<9||p[0].includes('ประทับเวลา'))return;const name=p[1].trim();candidates.unshift({name,initials:name.replace(/นาย|นางสาว|นาง|น\.ส\./g,'').trim().split(/\s+/).map(x=>x[0]).slice(0,2).join(''),date:p[0].split(',')[0],email:p[3].trim(),phone:p[4].trim(),line:p[5].trim(),address:p[6].trim(),resume:p[7].trim(),branch:(p[8].match(/\d{6}\s*:?[\s|]*([^|]+)/)||[])[1]?.trim()||'ไม่ระบุ',role:p[8].split('|').pop().replace(/^\s*\d{6}\s+\S+\s*/,'').trim(),status:'รอพิจารณา',comments:0});added++});updateBranches();render();dialog.close();showToast(`นำเข้าสำเร็จ ${added} รายการ`)};
-function showToast(message){const t=document.querySelector('#toast');t.textContent=message;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
-updateBranches();render();
+const hotspots = [...document.querySelectorAll('.hotspot')];
+const playScene = document.querySelector('#playScene');
+const timerEl = document.querySelector('#timer');
+const foundEl = document.querySelector('#foundCount');
+const progressBar = document.querySelector('#progressBar');
+const progressText = document.querySelector('#progressText');
+const hintButton = document.querySelector('#hintButton');
+const hintCountEl = document.querySelector('#hintCount');
+const modal = document.querySelector('#resultModal');
+const toast = document.querySelector('#toast');
+let found = new Set();
+let hints = 2;
+let seconds = 120;
+let finished = false;
+let timer;
+
+function formatTime(value) {
+  return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+}
+
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(showToast.timeout);
+  showToast.timeout = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+function updateScore() {
+  const count = found.size;
+  const percent = count * 20;
+  foundEl.textContent = count;
+  progressText.textContent = `${percent}%`;
+  progressBar.style.width = `${percent}%`;
+  if (count === hotspots.length) endGame(true);
+}
+
+function endGame(won) {
+  finished = true;
+  clearInterval(timer);
+  document.querySelector('#resultTitle').textContent = won ? 'เก่งมาก! คุณเจอครบแล้ว' : 'หมดเวลาแล้ว!';
+  document.querySelector('#resultMessage').textContent = won
+    ? `คุณตามหาจุดแตกต่างครบทั้ง 5 จุด โดยเหลือเวลา ${formatTime(seconds)}`
+    : `คุณเจอ ${found.size} จาก 5 จุด ลองอีกครั้งนะ`;
+  setTimeout(() => { modal.hidden = false; }, 350);
+}
+
+function startTimer() {
+  clearInterval(timer);
+  timer = setInterval(() => {
+    if (finished) return;
+    seconds -= 1;
+    timerEl.textContent = formatTime(seconds);
+    if (seconds <= 10) timerEl.style.color = '#d7192d';
+    if (seconds <= 0) endGame(false);
+  }, 1000);
+}
+
+hotspots.forEach((spot) => {
+  spot.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (finished || found.has(spot.dataset.id)) return;
+    found.add(spot.dataset.id);
+    spot.classList.remove('hint');
+    spot.classList.add('found');
+    spot.setAttribute('aria-label', `${spot.getAttribute('aria-label')} พบแล้ว`);
+    showToast('ถูกต้อง! พบ 1 จุดแล้ว 🎉');
+    updateScore();
+  });
+});
+
+playScene.addEventListener('click', (event) => {
+  if (finished || event.target.closest('.hotspot')) return;
+  const rect = playScene.getBoundingClientRect();
+  const miss = document.createElement('span');
+  miss.className = 'miss';
+  miss.style.left = `${event.clientX - rect.left}px`;
+  miss.style.top = `${event.clientY - rect.top}px`;
+  playScene.appendChild(miss);
+  setTimeout(() => miss.remove(), 700);
+});
+
+hintButton.addEventListener('click', () => {
+  if (!hints || finished) return;
+  const available = hotspots.filter((spot) => !found.has(spot.dataset.id));
+  if (!available.length) return;
+  hotspots.forEach((spot) => spot.classList.remove('hint'));
+  available[Math.floor(Math.random() * available.length)].classList.add('hint');
+  hints -= 1;
+  hintCountEl.textContent = hints;
+  if (!hints) hintButton.disabled = true;
+  showToast('สังเกตบริเวณที่กำลังกะพริบ 👀');
+});
+
+document.querySelector('#soundToggle').addEventListener('click', (event) => {
+  const button = event.currentTarget;
+  const enabled = button.getAttribute('aria-pressed') === 'true';
+  button.setAttribute('aria-pressed', String(!enabled));
+  document.querySelector('#soundIcon').textContent = enabled ? '♪' : '♫';
+  showToast(enabled ? 'ปิดเสียงแล้ว' : 'เปิดเสียงแล้ว');
+});
+
+document.querySelector('#playAgain').addEventListener('click', () => {
+  found = new Set();
+  hints = 2;
+  seconds = 120;
+  finished = false;
+  hotspots.forEach((spot) => spot.classList.remove('found', 'hint'));
+  hintCountEl.textContent = hints;
+  hintButton.disabled = false;
+  timerEl.textContent = formatTime(seconds);
+  timerEl.style.color = '';
+  modal.hidden = true;
+  updateScore();
+  startTimer();
+});
+
+startTimer();
