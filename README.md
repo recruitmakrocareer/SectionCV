@@ -24,6 +24,15 @@ python3 -m http.server 8000
 
 หรือสามารถดับเบิลคลิก `index.html` เพื่อเล่นแบบไม่เปิดเว็บเซิร์ฟเวอร์ได้
 
+## Deploy บน GitHub Pages
+
+โปรเจกต์มี GitHub Actions workflow สำหรับ deploy ให้อัตโนมัติแล้ว เมื่อ push branch `main` หรือ `work` ขึ้น GitHub:
+
+1. เปิด **Settings → Pages** ใน repository
+2. เลือก Source เป็น **GitHub Actions**
+3. Push branch `main` หรือ `work`
+4. ดู URL ของเกมได้จากหน้า **Actions** หลัง workflow `Deploy Makro game to GitHub Pages` ทำงานสำเร็จ
+
 ## แก้ปัญหา `ERR_CONNECTION_REFUSED`
 
 ข้อความนี้หมายความว่าเว็บเซิร์ฟเวอร์ยังไม่ได้เปิด หรือหน้าต่าง Terminal ที่เปิดเซิร์ฟเวอร์ถูกปิดไปแล้ว ให้ทำดังนี้:
