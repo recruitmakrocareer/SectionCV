@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="เกมจับผิดภาพ สนุกกับภารกิจตามหาจุดต่างในแม็คโคร">
-  <title>MAKRO — เกมจับผิดภาพ</title>
+  <meta name="description" content="เกมจับผิดภาพเสมือนจริง 3 ด่านในแม็คโคร ด่านละ 5 จุด เล่นบนมือถือได้">
+  <title>MAKRO — จับผิดภาพเสมือนจริง 3 ด่าน</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260907-2">
+  <link rel="stylesheet" href="styles.css?v=20260908-photos1">
 </head>
 <body>
   <header class="site-header">
@@ -25,82 +25,53 @@
   <main id="game">
     <section class="hero">
       <div class="sparkle sparkle-one">✦</div><div class="sparkle sparkle-two">✦</div>
-      <p class="kicker">สนุกทุกช้อป ลุ้นทุกจุด!</p>
+      <p class="kicker">3 ด่าน · 15 จุดต่าง</p>
       <h1>เกม<span>จับผิดภาพ</span></h1>
-      <p class="hero-copy">จับตาให้ดี แล้วค้นหา 5 จุดที่แตกต่างกัน<br>ในภาพบรรยากาศสุดคึกคักที่แม็คโคร</p>
+      <p class="hero-copy">ภาพเสมือนจริง รายละเอียดแน่นขึ้น · ด่านละ 5 จุด ใน 2 นาที</p>
       <div class="game-stats">
         <div class="stat"><span class="stat-icon clock-icon">◷</span><div><small>เวลาที่เหลือ</small><strong id="timer" role="timer" aria-label="เวลาที่เหลือ">02:00</strong></div></div>
         <div class="divider"></div>
-        <div class="stat"><span class="stat-icon target-icon">◎</span><div><small>พบแล้ว</small><strong><span id="foundCount">0</span><em>/5 จุด</em></strong></div></div>
+        <div class="stat"><span class="stat-icon target-icon">◎</span><div><small>พบในด่านนี้</small><strong><span id="foundCount">0</span><em>/5 จุด</em></strong></div></div>
       </div>
     </section>
 
     <section class="game-card" aria-label="เกมจับผิดภาพ">
       <div class="play-controls">
-        <p id="gameStatus" role="status">พร้อมแล้วแตะเริ่มเกม · หาให้ครบ 5 จุดใน 2 นาที</p>
-        <div class="control-buttons"><button id="startButton" type="button" class="primary-button">เริ่มเกม</button><button id="restartButton" type="button" class="secondary-button" disabled>เริ่มใหม่</button></div>
+        <p id="gameStatus" role="status">กำลังเตรียมภาพด่านที่ 1…</p>
+        <div class="control-buttons"><button id="startButton" type="button" class="primary-button" disabled>กำลังโหลดภาพ…</button><button id="restartButton" type="button" class="secondary-button" disabled>เริ่มด่านนี้ใหม่</button></div>
       </div>
       <noscript><p class="no-script">กรุณาเปิด JavaScript ในเบราว์เซอร์เพื่อเล่นเกมนี้</p></noscript>
+      <ol class="level-tracker" id="levelTracker" aria-label="ความคืบหน้า 3 ด่าน"></ol>
       <div class="card-top">
-        <div><span class="level-pill">ด่านที่ 1</span><h2>ช้อปสนุกที่แม็คโคร</h2></div>
+        <div><span class="level-pill" id="levelLabel">ด่านที่ 1 / 3</span><h2 id="levelTitle">โซนผักและผลไม้</h2></div>
         <div class="progress-wrap"><div class="progress-info"><span>ความคืบหน้า</span><b id="progressText">0%</b></div><div class="progress" id="gameProgress" role="progressbar" aria-label="จุดต่างที่พบ" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><i id="progressBar"></i></div></div>
       </div>
 
-      <div class="pictures" data-state="ready">
+      <div class="pictures" data-state="loading" aria-busy="true">
         <article class="picture-panel">
           <span class="picture-label">ภาพต้นฉบับ</span>
-          <div class="scene-wrap" data-scene="original" aria-label="ภาพต้นฉบับ แตะเพื่อเลือกจุดแตกต่าง">
-            <svg class="scene" viewBox="0 0 700 430" role="img" aria-label="ภาพต้นฉบับร้านแม็คโคร">
-              <defs><linearGradient id="wallA" x2="0" y2="1"><stop stop-color="#fff9e8"/><stop offset="1" stop-color="#f8e9bb"/></linearGradient><linearGradient id="floorA" x2="0" y2="1"><stop stop-color="#ead9aa"/><stop offset="1" stop-color="#d5bd82"/></linearGradient></defs>
-              <rect width="700" height="430" fill="url(#wallA)"/><rect y="315" width="700" height="115" fill="url(#floorA)"/>
-              <path d="M0 350H700M0 397H700M100 315l-28 115M260 315l-10 115M440 315l10 115M600 315l28 115" stroke="#c5a76a" stroke-width="2" opacity=".55"/>
-              <rect x="0" y="0" width="700" height="34" fill="#cf1727"/><text x="350" y="24" fill="white" font-family="Kanit" font-size="17" font-weight="700" text-anchor="middle">สด • คุ้ม • ครบ เพื่อผู้ประกอบการ</text>
-              <rect x="36" y="55" width="150" height="255" rx="4" fill="#faf2d7" stroke="#c8a967" stroke-width="5"/><rect x="43" y="66" width="136" height="30" fill="#e72431"/><text x="111" y="87" fill="white" font-family="Kanit" font-size="18" font-weight="700" text-anchor="middle">ผักและผลไม้</text>
-              <g stroke="#b09256" stroke-width="5"><path d="M42 147h138M42 211h138M42 274h138"/></g>
-              <g class="produce"><circle cx="61" cy="126" r="12" fill="#f1872d"/><circle cx="88" cy="125" r="13" fill="#e95434"/><circle cx="117" cy="126" r="13" fill="#70a942"/><circle cx="148" cy="125" r="12" fill="#f2ae28"/><ellipse cx="65" cy="187" rx="15" ry="10" fill="#5f9a3d"/><ellipse cx="102" cy="189" rx="16" ry="11" fill="#7eba45"/><circle cx="144" cy="188" r="13" fill="#dd4b3d"/><path d="M52 250q15-28 30 0M98 251q14-29 28 0M139 251q13-30 27 0" fill="#f2ce42" stroke="#d19f22" stroke-width="2"/></g>
-              <rect x="218" y="74" width="265" height="192" rx="4" fill="#f5dfaa" stroke="#c19d57" stroke-width="5"/><rect x="225" y="82" width="251" height="37" fill="#263e88"/><text x="350" y="107" fill="white" font-family="Kanit" font-size="21" font-weight="700" text-anchor="middle">สินค้าราคาส่ง</text>
-              <g><rect x="238" y="137" width="52" height="51" rx="4" fill="#f4c641"/><rect x="301" y="137" width="52" height="51" rx="4" fill="#65a8d8"/><rect x="364" y="137" width="52" height="51" rx="4" fill="#f17655"/><rect x="427" y="137" width="37" height="51" rx="4" fill="#7dbd62"/><path d="M226 199h250" stroke="#c19d57" stroke-width="6"/><rect x="240" y="210" width="44" height="44" fill="#e85639"/><rect x="297" y="210" width="44" height="44" fill="#f5f0d4"/><rect x="354" y="210" width="44" height="44" fill="#f3bd35"/><rect x="411" y="210" width="44" height="44" fill="#4e9a72"/></g>
-              <g class="sign"><path d="M535 74h115v74H535z" fill="#cf1727"/><text x="592" y="101" fill="white" font-family="Kanit" font-size="14" font-weight="700" text-anchor="middle">ราคาพิเศษ</text><text x="592" y="134" fill="#ffe249" font-family="Kanit" font-size="29" font-weight="800" text-anchor="middle">99.-</text><path d="M592 148v52" stroke="#795c33" stroke-width="6"/></g>
-              <g class="person"><circle cx="534" cy="227" r="25" fill="#ffd0a3"/><path d="M510 221q5-36 43-15l6 24-13-8-35 8z" fill="#382b24"/><rect x="501" y="251" width="69" height="84" rx="22" fill="#cf1727"/><path d="M514 274h44" stroke="white" stroke-width="5"/><path d="M514 332l-8 71M556 332l14 71" stroke="#263e69" stroke-width="16"/><path d="M507 275l-42 37M562 275l32 37" stroke="#ffd0a3" stroke-width="13" stroke-linecap="round"/></g>
-              <g class="cart"><path d="M392 294h88l-13 62h-61z" fill="#ddd" stroke="#777" stroke-width="5"/><path d="M393 294l-12-24h-19" fill="none" stroke="#555" stroke-width="6" stroke-linecap="round"/><path d="M402 310h70M401 327h67M418 296l-3 57M441 296v58M462 297l-5 56" stroke="#999" stroke-width="3"/><circle cx="414" cy="370" r="9" fill="#333"/><circle cx="460" cy="370" r="9" fill="#333"/><rect x="409" y="278" width="25" height="23" fill="#efc632"/><rect x="439" y="271" width="24" height="30" fill="#66a549"/></g>
-              <g class="boxes"><rect x="602" y="274" width="70" height="47" fill="#d89d4b" stroke="#a87535" stroke-width="3"/><path d="M637 274v47" stroke="#a87535" stroke-width="3"/><rect x="616" y="321" width="70" height="49" fill="#ca8c3e" stroke="#9c692b" stroke-width="3"/><path d="M651 321v49" stroke="#9c692b" stroke-width="3"/></g>
-            </svg>
+          <div class="scene-wrap playable" data-scene="original" aria-label="ภาพต้นฉบับ แตะเพื่อเลือกจุดแตกต่าง">
+            <img class="scene" id="originalImage" width="1536" height="1024" alt="ภาพเสมือนจริงของโซนผักและผลไม้" draggable="false">
           </div>
         </article>
-
         <article class="picture-panel">
-          <span class="picture-label different">ภาพที่แตกต่าง</span>
+          <span class="picture-label different">ภาพที่แตกต่าง · 5 จุด</span>
           <div class="scene-wrap playable" id="playScene" data-scene="different" aria-label="ภาพที่แตกต่าง แตะเพื่อเลือกจุดแตกต่าง">
-            <svg class="scene" viewBox="0 0 700 430" role="img" aria-label="ภาพร้านแม็คโครที่มีจุดแตกต่าง 5 จุด">
-              <defs><linearGradient id="wallB" x2="0" y2="1"><stop stop-color="#fff9e8"/><stop offset="1" stop-color="#f8e9bb"/></linearGradient><linearGradient id="floorB" x2="0" y2="1"><stop stop-color="#ead9aa"/><stop offset="1" stop-color="#d5bd82"/></linearGradient></defs>
-              <rect width="700" height="430" fill="url(#wallB)"/><rect y="315" width="700" height="115" fill="url(#floorB)"/><path d="M0 350H700M0 397H700M100 315l-28 115M260 315l-10 115M440 315l10 115M600 315l28 115" stroke="#c5a76a" stroke-width="2" opacity=".55"/>
-              <rect x="0" y="0" width="700" height="34" fill="#cf1727"/><text x="350" y="24" fill="white" font-family="Kanit" font-size="17" font-weight="700" text-anchor="middle">สด • คุ้ม • ครบ เพื่อผู้ประกอบการ</text>
-              <rect x="36" y="55" width="150" height="255" rx="4" fill="#faf2d7" stroke="#c8a967" stroke-width="5"/><rect x="43" y="66" width="136" height="30" fill="#e72431"/><text x="111" y="87" fill="white" font-family="Kanit" font-size="18" font-weight="700" text-anchor="middle">ผักและผลไม้</text><g stroke="#b09256" stroke-width="5"><path d="M42 147h138M42 211h138M42 274h138"/></g>
-              <g><circle cx="61" cy="126" r="12" fill="#f1872d"/><circle cx="88" cy="125" r="13" fill="#e95434"/><circle cx="117" cy="126" r="13" fill="#70a942"/><circle cx="148" cy="125" r="12" fill="#f2ae28"/><ellipse cx="65" cy="187" rx="15" ry="10" fill="#5f9a3d"/><ellipse cx="102" cy="189" rx="16" ry="11" fill="#7eba45"/><circle cx="144" cy="188" r="13" fill="#7654ba"/><path d="M52 250q15-28 30 0M98 251q14-29 28 0M139 251q13-30 27 0" fill="#f2ce42" stroke="#d19f22" stroke-width="2"/></g>
-              <rect x="218" y="74" width="265" height="192" rx="4" fill="#f5dfaa" stroke="#c19d57" stroke-width="5"/><rect x="225" y="82" width="251" height="37" fill="#263e88"/><text x="350" y="107" fill="white" font-family="Kanit" font-size="21" font-weight="700" text-anchor="middle">สินค้าราคาส่ง</text><g><rect x="238" y="137" width="52" height="51" rx="4" fill="#f4c641"/><rect x="301" y="137" width="52" height="51" rx="4" fill="#65a8d8"/><rect x="364" y="137" width="52" height="51" rx="4" fill="#f17655"/><path d="M226 199h250" stroke="#c19d57" stroke-width="6"/><rect x="240" y="210" width="44" height="44" fill="#e85639"/><rect x="297" y="210" width="44" height="44" fill="#f5f0d4"/><rect x="354" y="210" width="44" height="44" fill="#f3bd35"/><rect x="411" y="210" width="44" height="44" fill="#4e9a72"/></g>
-              <g><path d="M535 74h115v74H535z" fill="#cf1727"/><text x="592" y="101" fill="white" font-family="Kanit" font-size="14" font-weight="700" text-anchor="middle">ราคาพิเศษ</text><text x="592" y="134" fill="#ffe249" font-family="Kanit" font-size="29" font-weight="800" text-anchor="middle">89.-</text><path d="M592 148v52" stroke="#795c33" stroke-width="6"/></g>
-              <g><circle cx="534" cy="227" r="25" fill="#ffd0a3"/><path d="M510 221q5-36 43-15l6 24-13-8-35 8z" fill="#382b24"/><rect x="501" y="251" width="69" height="84" rx="22" fill="#263e88"/><path d="M514 274h44" stroke="white" stroke-width="5"/><path d="M514 332l-8 71M556 332l14 71" stroke="#263e69" stroke-width="16"/><path d="M507 275l-42 37M562 275l32 37" stroke="#ffd0a3" stroke-width="13" stroke-linecap="round"/></g>
-              <g><path d="M392 294h88l-13 62h-61z" fill="#ddd" stroke="#777" stroke-width="5"/><path d="M393 294l-12-24h-19" fill="none" stroke="#555" stroke-width="6" stroke-linecap="round"/><path d="M402 310h70M401 327h67M418 296l-3 57M441 296v58M462 297l-5 56" stroke="#999" stroke-width="3"/><circle cx="414" cy="370" r="9" fill="#333"/><circle cx="460" cy="370" r="9" fill="#333"/><rect x="409" y="278" width="25" height="23" fill="#efc632"/></g>
-              <g><rect x="602" y="274" width="70" height="47" fill="#d89d4b" stroke="#a87535" stroke-width="3"/><path d="M637 274v47" stroke="#a87535" stroke-width="3"/><rect x="616" y="321" width="70" height="49" fill="#ca8c3e" stroke="#9c692b" stroke-width="3"/><path d="M651 321v49" stroke="#9c692b" stroke-width="3"/></g>
-            </svg>
-            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="fruit" style="--x:20.5%;--y:44%;--size:12%" aria-label="จุดแตกต่างที่ผลไม้"></button>
-            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="shelf" style="--x:63.6%;--y:37.8%;--size:12%" aria-label="จุดแตกต่างที่ชั้นสินค้า"></button>
-            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="price" style="--x:84.6%;--y:28.5%;--size:14%" aria-label="จุดแตกต่างที่ป้ายราคา"></button>
-            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="shirt" style="--x:76.5%;--y:68%;--size:13%" aria-label="จุดแตกต่างที่เสื้อพนักงาน"></button>
-            <button class="hotspot" type="button" disabled aria-pressed="false" data-id="cart" style="--x:64.4%;--y:66.5%;--size:10%" aria-label="จุดแตกต่างที่รถเข็น"></button>
+            <img class="scene" id="comparisonImage" width="1536" height="1024" alt="ภาพเปรียบเทียบที่มีจุดแตกต่าง 5 จุด" draggable="false">
+            <img class="difference-layer" id="differenceImage" width="1536" height="1024" alt="" aria-hidden="true" draggable="false">
           </div>
         </article>
       </div>
-      <div class="game-actions"><p><span>💡</span> แตะจุดต่างได้ทั้งสองภาพ</p><button id="hintButton" type="button" disabled><span>◎</span> ใช้คำใบ้ <b id="hintCount">2</b></button></div>
+      <div class="game-actions"><p><span>💡</span> แตะจุดต่างได้ทั้งสองภาพ<span class="zoom-tip">ใช้สองนิ้วซูมเพื่อดูรายละเอียด</span></p><button id="hintButton" type="button" disabled><span>◎</span> ใช้คำใบ้ <b id="hintCount">2</b></button></div>
     </section>
 
     <section class="how-to" id="howto">
       <p class="section-kicker">HOW TO PLAY</p><h2>วิธีเล่นง่าย ๆ</h2>
-      <div class="steps"><article><b>1</b><span>👀</span><h3>สังเกตภาพ</h3><p>เปรียบเทียบภาพทั้งสองด้าน<br>อย่างละเอียด</p></article><i></i><article><b>2</b><span>☝️</span><h3>แตะจุดต่าง</h3><p>เจอแล้วแตะที่ตำแหน่ง<br>ในภาพใดก็ได้</p></article><i></i><article><b>3</b><span>🎉</span><h3>ค้นหาให้ครบ</h3><p>ตามหาให้ครบทั้ง 5 จุด<br>ก่อนหมดเวลา</p></article></div>
+      <div class="steps"><article><b>1</b><span>👀</span><h3>สังเกตภาพ</h3><p>เปรียบเทียบภาพทั้งสองด้าน<br>อย่างละเอียด</p></article><i></i><article><b>2</b><span>☝️</span><h3>แตะจุดต่าง</h3><p>เจอแล้วแตะที่ตำแหน่ง<br>ในภาพใดก็ได้</p></article><i></i><article><b>3</b><span>🎉</span><h3>ค้นหาให้ครบ</h3><p>หาครบ 5 จุดแล้วไปด่านถัดไป<br>ผ่านให้ครบทั้ง 3 ด่าน</p></article></div>
     </section>
   </main>
 
-  <footer><a class="logo footer-logo" href="#">makro<span>.</span></a><p>สนุกทุกช้อป คุ้มทุกวัน ที่แม็คโคร</p><small>Makro · เกมจับผิดภาพ</small></footer>
+  <footer><a class="logo footer-logo" href="#">makro<span>.</span></a><p>สนุกทุกช้อป คุ้มทุกวัน ที่แม็คโคร</p><small>Makro · เกมจับผิดภาพเสมือนจริง</small></footer>
 
   <div class="modal" id="resultModal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultMessage">
@@ -108,6 +79,7 @@
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260907-2"></script>
+  <script src="levels.js?v=20260908-photos1"></script>
+  <script src="app.js?v=20260908-photos1"></script>
 </body>
 </html>

@@ -1,11 +1,13 @@
 (() => {
   'use strict';
   const $ = (selector) => document.querySelector(selector);
+  const levels = window.MAKRO_LEVELS;
   const playScene = $('#playScene');
   const originalScene = $('[data-scene="original"]');
-  const templates = [...playScene.querySelectorAll('.hotspot')];
-  const ids = templates.map((spot) => spot.dataset.id);
-  const total = ids.length;
+  const pictures = $('.pictures');
+  const originalImage = $('#originalImage');
+  const comparisonImage = $('#comparisonImage');
+  const differenceImage = $('#differenceImage');
   const duration = 120_000;
   const timerEl = $('#timer');
   const hintButton = $('#hintButton');
@@ -14,23 +16,25 @@
   const modal = $('#resultModal');
   const soundToggle = $('#soundToggle');
   const background = [$('header'), $('main'), $('footer')];
-
-  // Both pictures share the same five answers and a single score.
-  originalScene.classList.add('playable');
-  templates.forEach((spot) => originalScene.appendChild(spot.cloneNode(true)));
-  const hotspots = [...document.querySelectorAll('.hotspot')];
-  const labels = new Map(hotspots.map((spot) => [spot, spot.getAttribute('aria-label')]));
+  const completed = Array(levels.length).fill(null);
+  const missTimers = new Set();
+  let levelIndex = 0;
+  let level = levels[0];
+  let ids = [];
+  let hotspots = [];
   let found = new Set();
   let hinted = new Set();
   let hints = 2;
-  let phase = 'ready';
+  let phase = 'loading';
   let remaining = duration;
   let deadline = 0;
   let timer;
   let toastTimer;
+  let loadGeneration = 0;
+  let roundWon = false;
   let soundEnabled = false;
   let audioContext;
-  const missTimers = new Set();
+  const preloaded = new Map();
 
   const formatTime = (milliseconds) => {
     const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
@@ -102,26 +106,47 @@
     }
   });
 
+  function nextActionLabel() {
+    if (!roundWon) return 'ลองด่านนี้อีกครั้ง';
+    return levelIndex < levels.length - 1 ? `ไปด่านที่ ${levelIndex + 2}` : 'เริ่มใหม่ทั้ง 3 ด่าน';
+  }
+
   function render() {
     timerEl.textContent = formatTime(remaining);
     timerEl.classList.toggle('urgent', phase === 'playing' && Math.ceil(remaining / 1000) <= 10);
     $('#foundCount').textContent = found.size;
-    const percent = Math.round(found.size / total * 100);
+    const percent = Math.round(found.size / Math.max(1, ids.length) * 100);
     $('#progressText').textContent = `${percent}%`;
     $('#progressBar').style.width = `${percent}%`;
     $('#gameProgress').setAttribute('aria-valuenow', String(found.size));
     $('#hintCount').textContent = hints;
     hintButton.disabled = phase !== 'playing' || hints === 0 || ids.every((id) => found.has(id) || hinted.has(id));
-    startButton.textContent = { ready: 'เริ่มเกม', playing: 'หยุดพัก', paused: 'เล่นต่อ', finished: 'เล่นอีกครั้ง' }[phase];
-    restartButton.disabled = phase === 'ready';
+    startButton.textContent = {
+      loading: 'กำลังโหลดภาพ…', error: 'ลองโหลดภาพอีกครั้ง', ready: `เริ่มด่านที่ ${levelIndex + 1}`,
+      playing: 'หยุดพัก', paused: 'เล่นต่อ', finished: nextActionLabel()
+    }[phase];
+    startButton.disabled = phase === 'loading';
+    restartButton.disabled = ['loading', 'error', 'ready'].includes(phase);
     const status = {
-      ready: 'พร้อมแล้วแตะเริ่มเกม · หาให้ครบ 5 จุดใน 2 นาที',
-      playing: 'แตะจุดต่างในภาพใดก็ได้ · ใช้คำใบ้ได้ 2 ครั้ง',
+      loading: `กำลังเตรียมภาพด่านที่ ${levelIndex + 1}…`,
+      error: 'โหลดภาพไม่สำเร็จ ตรวจการเชื่อมต่อแล้วแตะลองโหลดภาพอีกครั้ง',
+      ready: `ด่านที่ ${levelIndex + 1} / ${levels.length} · พร้อมแล้วแตะเริ่มด่าน · 5 จุดใน 2 นาที`,
+      playing: 'แตะจุดต่างในภาพใดก็ได้ · คำใบ้ 2 ครั้งต่อด่าน',
       paused: 'หยุดพักแล้ว · แตะเล่นต่อเมื่อพร้อม',
-      finished: 'จบเกมแล้ว · แตะเล่นอีกครั้งเพื่อเริ่มรอบใหม่'
+      finished: roundWon ? (levelIndex === levels.length - 1 ? 'ผ่านครบทั้ง 3 ด่านแล้ว!' : `ผ่านด่านที่ ${levelIndex + 1} แล้ว · ไปต่อด่านถัดไปได้เลย`) : 'หมดเวลาแล้ว · ลองด่านนี้ใหม่ได้เลย'
     }[phase];
     if ($('#gameStatus').textContent !== status) $('#gameStatus').textContent = status;
-    $('.pictures').dataset.state = phase;
+    pictures.dataset.state = phase;
+    pictures.setAttribute('aria-busy', String(phase === 'loading'));
+    $('#levelLabel').textContent = `ด่านที่ ${levelIndex + 1} / ${levels.length}`;
+    $('#levelTitle').textContent = level.title;
+    [...$('#levelTracker').children].forEach((item, index) => {
+      item.classList.toggle('current', index === levelIndex);
+      item.classList.toggle('completed', completed[index] !== null);
+      if (index === levelIndex) item.setAttribute('aria-current', 'step');
+      else item.removeAttribute('aria-current');
+      item.querySelector('b').textContent = completed[index] !== null ? '✓' : index + 1;
+    });
     hotspots.forEach((spot) => {
       const matched = found.has(spot.dataset.id);
       spot.disabled = phase !== 'playing' || matched;
@@ -129,41 +154,43 @@
       spot.classList.toggle('hint', phase === 'playing' && hinted.has(spot.dataset.id) && !matched);
       spot.classList.toggle('revealed', phase === 'finished' && !matched);
       spot.setAttribute('aria-pressed', String(matched));
-      spot.setAttribute('aria-label', `${labels.get(spot)}${matched ? ' พบแล้ว' : ''}`);
+      spot.setAttribute('aria-label', `${spot.dataset.label}${matched ? ' พบแล้ว' : ''}`);
     });
   }
 
   function closeResult() {
     modal.hidden = true;
     background.forEach((element) => { element.inert = false; });
-    startButton.focus();
+    if (!startButton.disabled) startButton.focus();
   }
 
   function endGame(won) {
     if (phase !== 'playing') return;
     phase = 'finished';
+    roundWon = won;
     clearInterval(timer);
+    if (won) completed[levelIndex] = duration - remaining;
+    const finishedAll = completed.every((elapsed) => elapsed !== null);
     render();
     $('#resultIcon').textContent = won ? '🏆' : '⏰';
-    $('#resultLabel').textContent = won ? 'พบครบแล้ว!' : 'หมดเวลา';
-    $('#resultTitle').textContent = won ? 'เก่งมาก! คุณเจอครบแล้ว' : 'หมดเวลาแล้ว!';
-    $('#resultMessage').textContent = won
-      ? `พบครบทั้ง ${total} จุด เหลือเวลา ${formatTime(remaining)}`
-      : `พบ ${found.size} จาก ${total} จุด ดูวงสีเหลืองเพื่อดูจุดที่เหลือ แล้วลองใหม่ได้เลย`;
+    $('#resultLabel').textContent = finishedAll ? 'สำเร็จทั้ง 3 ด่าน' : won ? `ผ่านด่านที่ ${levelIndex + 1}` : 'หมดเวลา';
+    $('#resultTitle').textContent = finishedAll ? 'สุดยอด! พบครบทั้ง 15 จุด' : won ? 'เก่งมาก! เจอครบ 5 จุดแล้ว' : 'ลองอีกครั้งนะ!';
+    $('#resultMessage').textContent = finishedAll
+      ? `ผ่านครบ ${levels.length} ด่าน ใช้เวลารวม ${formatTime(completed.reduce((sum, elapsed) => sum + elapsed, 0))}`
+      : won
+        ? `เหลือเวลา ${formatTime(remaining)} · ด่านถัดไป: ${levels[levelIndex + 1].title}`
+        : `พบ ${found.size} จาก ${ids.length} จุด วงสีเหลืองแสดงจุดที่เหลือ ลองด่านนี้อีกครั้งได้โดยไม่ต้องกลับไปด่านแรก`;
+    $('#playAgain').textContent = nextActionLabel();
     modal.hidden = false;
     background.forEach((element) => { element.inert = true; });
     $('#playAgain').focus();
     playSound(won ? 'win' : 'lose');
   }
 
-  // Recheck the real deadline before every action, including delayed clicks.
   function syncTime() {
     if (phase !== 'playing') return false;
     remaining = Math.max(0, deadline - performance.now());
-    if (remaining === 0) {
-      endGame(false);
-      return false;
-    }
+    if (remaining === 0) { endGame(false); return false; }
     render();
     return true;
   }
@@ -176,6 +203,14 @@
     timer = setInterval(syncTime, 250);
     render();
     if (soundEnabled) audioContext.resume().catch(() => {});
+    // Fetch the next scene only after play starts; current photos take priority.
+    const next = levels[levelIndex + 1];
+    if (next) [next.original, next.edited].forEach((src) => {
+      if (preloaded.has(src)) return;
+      const image = new Image();
+      image.src = src;
+      preloaded.set(src, image);
+    });
   }
 
   function pauseGame() {
@@ -185,7 +220,7 @@
     render();
   }
 
-  function resetGame() {
+  function clearRound() {
     clearInterval(timer);
     clearTimeout(toastTimer);
     missTimers.forEach((timeout) => clearTimeout(timeout));
@@ -196,29 +231,125 @@
     hinted = new Set();
     hints = 2;
     remaining = duration;
+    roundWon = false;
+  }
+
+  function resetRound() {
+    if (phase === 'loading' || phase === 'error') return;
+    clearRound();
+    completed[levelIndex] = null;
     phase = 'ready';
-    closeResult();
     render();
+    closeResult();
+  }
+
+  function waitForImage(image, src) {
+    return new Promise((resolve, reject) => {
+      const finish = () => {
+        image.onload = null;
+        image.onerror = null;
+        if (!image.naturalWidth || !image.naturalHeight) return reject(new Error('Invalid image'));
+        resolve();
+      };
+      image.onload = finish;
+      image.onerror = () => { image.onload = null; image.onerror = null; reject(new Error('Image could not load')); };
+      image.src = src;
+      if (image.complete && image.naturalWidth) finish();
+    });
+  }
+
+  function createHotspots() {
+    hotspots.forEach((spot) => spot.remove());
+    hotspots = [];
+    ids = level.differences.map((difference) => difference.id);
+    [originalScene, playScene].forEach((scene) => {
+      level.differences.forEach((difference, index) => {
+        const spot = document.createElement('button');
+        spot.className = 'hotspot';
+        spot.type = 'button';
+        spot.dataset.id = difference.id;
+        spot.dataset.label = `จุดแตกต่างที่ ${index + 1}`;
+        spot.style.setProperty('--x', `${difference.x}%`);
+        spot.style.setProperty('--y', `${difference.y}%`);
+        spot.style.setProperty('--size', `${difference.targetSize || Math.max(6, difference.width * 0.7)}%`);
+        spot.disabled = true;
+        spot.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (!syncTime() || found.has(spot.dataset.id)) return;
+          found.add(spot.dataset.id);
+          render();
+          if (found.size === ids.length) return endGame(true);
+          showToast(`ถูกต้อง! พบแล้ว ${found.size} / ${ids.length} จุด 🎉`);
+          playSound('found');
+        });
+        scene.appendChild(spot);
+        hotspots.push(spot);
+      });
+    });
+  }
+
+  function loadLevel(index, autoStart = false) {
+    const generation = ++loadGeneration;
+    clearRound();
+    closeResult();
+    levelIndex = index;
+    level = levels[index];
+    phase = 'loading';
+    createHotspots();
+    [originalImage, comparisonImage, differenceImage].forEach((image) => {
+      image.width = level.width;
+      image.height = level.height;
+    });
+    pictures.style.setProperty('--photo-aspect', `${level.width} / ${level.height}`);
+    originalImage.alt = `ภาพเสมือนจริง ${level.title}`;
+    comparisonImage.alt = `ภาพเปรียบเทียบ ${level.title} มีจุดแตกต่าง 5 จุด`;
+    // Both panels use the SAME original photograph. Only the five authored
+    // regions show the edited photograph, avoiding incidental AI changes elsewhere.
+    const mask = level.differences.map((difference) =>
+      `radial-gradient(ellipse ${difference.width / 2}% ${difference.height / 2}% at ${difference.x}% ${difference.y}%, #000 76%, transparent 100%)`
+    ).join(', ');
+    differenceImage.style.maskImage = mask;
+    differenceImage.style.webkitMaskImage = mask;
+    render();
+    return Promise.all([
+      waitForImage(originalImage, level.original),
+      waitForImage(comparisonImage, level.original),
+      waitForImage(differenceImage, level.edited)
+    ]).then(() => {
+      if (generation !== loadGeneration || phase !== 'loading') return;
+      if ([originalImage, comparisonImage, differenceImage].some((image) => image.naturalWidth !== level.width || image.naturalHeight !== level.height)) {
+        throw new Error('The photo dimensions do not match the answer coordinates');
+      }
+      phase = 'ready';
+      render();
+      if (autoStart && !document.hidden) startGame();
+    }).catch(() => {
+      if (generation !== loadGeneration) return;
+      phase = 'error';
+      render();
+    });
+  }
+
+  function proceed() {
+    if (phase !== 'finished') return;
+    if (roundWon && levelIndex < levels.length - 1) return loadLevel(levelIndex + 1, true);
+    if (roundWon) {
+      completed.fill(null);
+      return loadLevel(0, true);
+    }
+    resetRound();
+    startGame();
   }
 
   startButton.addEventListener('click', () => {
+    if (phase === 'error') return loadLevel(levelIndex);
     if (phase === 'playing') return pauseGame();
-    if (phase === 'finished') resetGame();
+    if (phase === 'finished') return proceed();
     startGame();
   });
-  restartButton.addEventListener('click', resetGame);
-  $('#playAgain').addEventListener('click', () => { resetGame(); startGame(); });
+  restartButton.addEventListener('click', resetRound);
+  $('#playAgain').addEventListener('click', proceed);
   $('#closeResult').addEventListener('click', closeResult);
-
-  hotspots.forEach((spot) => spot.addEventListener('click', (event) => {
-    event.stopPropagation();
-    if (!syncTime() || found.has(spot.dataset.id)) return;
-    found.add(spot.dataset.id);
-    render();
-    if (found.size === total) return endGame(true);
-    showToast(`ถูกต้อง! พบแล้ว ${found.size} / ${total} จุด 🎉`);
-    playSound('found');
-  }));
 
   [originalScene, playScene].forEach((scene) => scene.addEventListener('click', (event) => {
     if (event.target.closest('.hotspot') || !syncTime()) return;
@@ -261,6 +392,15 @@
     }
   });
 
+  levels.forEach((entry, index) => {
+    const item = document.createElement('li');
+    const number = document.createElement('b');
+    const name = document.createElement('span');
+    number.textContent = index + 1;
+    name.textContent = entry.shortTitle;
+    item.append(number, name);
+    $('#levelTracker').appendChild(item);
+  });
   updateSoundButton();
-  render();
+  loadLevel(0);
 })();

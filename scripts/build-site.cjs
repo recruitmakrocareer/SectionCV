@@ -2,10 +2,12 @@ const { mkdirSync, copyFileSync } = require('node:fs');
 const { join, dirname, resolve } = require('node:path');
 
 const root = resolve(__dirname, '..');
+const levels = require('../levels.js');
 // Publish only runtime assets, keeping tooling and dependencies out of Pages.
 const publicFiles = [
-  'index.html', 'app.js', 'styles.css', '.nojekyll',
-  'memory-game/index.html', 'docs/memory-game/index.html'
+  'index.html', 'app.js', 'levels.js', 'styles.css', '.nojekyll',
+  'memory-game/index.html', 'docs/memory-game/index.html',
+  ...levels.flatMap((level) => [level.original, level.edited])
 ];
 for (const file of publicFiles) {
   const destination = join(root, '_site', file);

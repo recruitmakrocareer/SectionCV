@@ -155,3 +155,35 @@ footer small { font-size: 12px; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .hotspot.hint { box-shadow: 0 0 0 3px #bf8c00, 0 0 0 6px white; }
 }
+
+/* Photographic levels retain the existing compact mobile game surface. */
+.scene { aspect-ratio: var(--photo-aspect, 3 / 2); object-fit: contain; }
+.difference-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1; }
+.hotspot { z-index: 2; }
+.miss { z-index: 3; }
+.level-tracker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; list-style: none; padding: 0 0 14px; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
+.level-tracker li { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #736f68; }
+.level-tracker b { width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid #d8d3c9; border-radius: 50%; background: #faf8f3; }
+.level-tracker .current { color: var(--red); font-weight: 600; }
+.level-tracker .current b { background: var(--red); border-color: var(--red); color: white; }
+.level-tracker .completed { color: #1c6747; }
+.level-tracker .completed b { color: white; background: #1c6747; border-color: #1c6747; }
+.pictures[data-state='paused'] .difference-layer { filter: blur(12px); }
+.pictures[data-state='paused'] .scene-wrap::after { z-index: 4; }
+.pictures[data-state='loading'] .scene,
+.pictures[data-state='loading'] .difference-layer,
+.pictures[data-state='error'] .scene,
+.pictures[data-state='error'] .difference-layer { visibility: hidden; }
+.pictures[data-state='loading'] .scene-wrap::after,
+.pictures[data-state='error'] .scene-wrap::after { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 16px; line-height: 1.5; z-index: 4; background: #f4f1eb; }
+.pictures[data-state='loading'] .scene-wrap::after { content: 'กำลังโหลดภาพ…'; }
+.pictures[data-state='error'] .scene-wrap::after { content: 'ยังโหลดภาพไม่ได้'; }
+.primary-button:disabled { opacity: .65; }
+@media (max-width: 800px) {
+  .level-tracker { gap: 8px; padding-bottom: 10px; margin-bottom: 10px; }
+  .level-tracker li { gap: 6px; font-size: 12px; }
+  .level-tracker b { width: 26px; height: 26px; }
+}
+
+.zoom-tip { display: none; }
+@media (max-width: 800px) { .zoom-tip { display: block; font-size: 12px; margin-top: 2px; } }

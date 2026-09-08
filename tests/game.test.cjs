@@ -3,13 +3,14 @@ const assert = require('node:assert/strict');
 const { readFileSync, existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { JSDOM, VirtualConsole } = require('jsdom');
-
+const levels = require('../levels.js');
 const root = resolve(__dirname, '..');
 const html = readFileSync(resolve(root, 'index.html'), 'utf8');
 const script = readFileSync(resolve(root, 'app.js'), 'utf8');
-const answerIds = ['fruit', 'shelf', 'price', 'shirt', 'cart'];
+const levelScript = readFileSync(resolve(root, 'levels.js'), 'utf8');
+const flush = () => new Promise(setImmediate);
 
-function game(t, configure = () => {}) {
+async function game(t, { configure = () => {}, load = true } = {}) {
   const errors = [];
   const console = new VirtualConsole();
   console.on('jsdomError', (error) => errors.push(error));
@@ -24,14 +25,31 @@ function game(t, configure = () => {}) {
   window.clearInterval = (id) => intervals.delete(id);
   window.setTimeout = (fn, delay) => { const id = ++sequence; timeouts.set(id, { fn, due: now + delay }); return id; };
   window.clearTimeout = (id) => timeouts.delete(id);
+  const prototype = window.HTMLImageElement.prototype;
+  const source = Object.getOwnPropertyDescriptor(prototype, 'src');
+  Object.defineProperty(prototype, 'src', {
+    get() { return source.get.call(this); },
+    set(value) { this.readyInTest = false; source.set.call(this, value); }
+  });
+  Object.defineProperty(prototype, 'complete', { get() { return !!this.readyInTest; } });
+  Object.defineProperty(prototype, 'naturalWidth', { get() { return this.readyInTest ? (this.width || 1536) : 0; } });
+  Object.defineProperty(prototype, 'naturalHeight', { get() { return this.readyInTest ? (this.height || 1024) : 0; } });
   configure(window);
+  window.eval(levelScript);
   window.eval(script);
   const $ = (selector) => window.document.querySelector(selector);
-  t.after(() => { dom.window.close(); assert.deepEqual(errors, []); });
-  return {
+  const g = {
     window, $, intervals,
     click: (selector) => $(selector).click(),
     hit: (id, side = 'different') => $(`[data-scene="${side}"] [data-id="${id}"]`).click(),
+    win(index) { levels[index].differences.forEach((point, i) => g.hit(point.id, i % 2 ? 'original' : 'different')); },
+    async loadImages(fail = '') {
+      for (const image of window.document.querySelectorAll('.pictures img')) {
+        image.readyInTest = image.id !== fail;
+        image.dispatchEvent(new window.Event(image.id === fail ? 'error' : 'load'));
+      }
+      await flush();
+    },
     advance(milliseconds, tick = true) {
       now += milliseconds;
       if (tick) [...intervals.values()].forEach((fn) => fn());
@@ -40,79 +58,128 @@ function game(t, configure = () => {}) {
       }
     }
   };
+  t.after(() => { window.close(); assert.deepEqual(errors, []); });
+  if (load) await g.loadImages();
+  return g;
 }
 
-test('waits for Start and accepts touch-generated clicks on either picture once per answer', (t) => {
-  const g = game(t);
+const first = () => levels[0].differences[0].id;
+
+test('cannot start before the photos load and recovers from a failed image request', async (t) => {
+  const g = await game(t, { load: false });
+  assert.equal(g.$('#startButton').disabled, true);
+  g.click('#startButton');
+  g.advance(180_000);
+  assert.equal(g.$('#timer').textContent, '02:00');
+  await g.loadImages('differenceImage');
+  assert.equal(g.$('.pictures').dataset.state, 'error');
+  assert.equal(g.$('#startButton').disabled, false);
+  g.click('#startButton');
+  assert.equal(g.$('.pictures').dataset.state, 'loading');
+  await g.loadImages();
+  assert.equal(g.$('.pictures').dataset.state, 'ready');
+  assert.equal(g.intervals.size, 0);
+  g.click('#startButton');
+  assert.equal(g.intervals.size, 1);
+});
+
+test('waits for Start and counts the same answer in either photograph only once', async (t) => {
+  const g = await game(t);
   g.advance(60_000);
   assert.equal(g.$('#timer').textContent, '02:00');
-  assert.equal(g.intervals.size, 0);
-  g.hit('fruit');
+  g.hit(first());
   assert.equal(g.$('#foundCount').textContent, '0');
   g.click('#startButton');
-  g.hit('fruit', 'original');
-  g.hit('fruit');
+  g.hit(first(), 'original');
+  g.hit(first());
   assert.equal(g.$('#foundCount').textContent, '1');
-  assert.equal(g.window.document.querySelectorAll('[data-id="fruit"].found').length, 2);
+  assert.equal(g.window.document.querySelectorAll(`[data-id="${first()}"].found`).length, 2);
   g.$('#playScene').dispatchEvent(new g.window.MouseEvent('click', { bubbles: true, clientX: 10, clientY: 10 }));
-  assert.equal(g.$('#foundCount').textContent, '1');
   assert.ok(g.$('.miss'));
+  assert.equal(g.$('#foundCount').textContent, '1');
   g.advance(700);
   assert.equal(g.$('.miss'), null);
 });
 
-test('winning shows the result, stops time and supports repeat rounds without stale labels', (t) => {
-  const g = game(t);
+test('completes all three levels in order, totals 15 answers, then starts a fresh campaign', async (t) => {
+  const g = await game(t);
   g.click('#startButton');
-  g.advance(30_000);
-  for (let round = 0; round < 3; round++) {
-    answerIds.forEach((id, index) => g.hit(id, index % 2 ? 'original' : 'different'));
+  for (let index = 0; index < levels.length; index++) {
+    assert.equal(g.$('#levelTitle').textContent, levels[index].title);
+    g.advance(20_000);
+    g.win(index);
     assert.equal(g.$('#foundCount').textContent, '5');
     assert.equal(g.$('#progressText').textContent, '100%');
     assert.equal(g.$('#gameProgress').getAttribute('aria-valuenow'), '5');
     assert.equal(g.$('#resultModal').hidden, false);
     assert.equal(g.window.document.activeElement, g.$('#playAgain'));
     assert.equal(g.intervals.size, 0);
-    g.click('#playAgain');
-    assert.equal(g.$('#resultModal').hidden, true);
-    assert.equal(g.$('#timer').textContent, '02:00');
-    assert.equal(g.$('#foundCount').textContent, '0');
-    assert.equal(g.$('#hintCount').textContent, '2');
-    assert.equal(g.$('.found'), null);
-    assert.equal(g.$('.hint'), null);
-    assert.equal(g.$('[data-id="fruit"]').getAttribute('aria-label'), 'จุดแตกต่างที่ผลไม้');
-    assert.equal(g.intervals.size, 1);
+    assert.equal(g.window.document.querySelectorAll('#levelTracker .completed').length, index + 1);
+    if (index < 2) {
+      assert.equal(g.$('#playAgain').textContent, `ไปด่านที่ ${index + 2}`);
+      g.click('#playAgain');
+      g.click('#playAgain'); // Rapid double clicks must not skip a level.
+      assert.equal(g.intervals.size, 0);
+      assert.equal(g.$('#foundCount').textContent, '0');
+      assert.equal(g.$('#hintCount').textContent, '2');
+      assert.equal(g.$('#resultModal').hidden, true);
+      await g.loadImages();
+      assert.equal(g.intervals.size, 1);
+    }
   }
+  assert.match(g.$('#resultTitle').textContent, /15/);
+  assert.match(g.$('#resultMessage').textContent, /01:00/);
+  g.click('#playAgain');
+  await g.loadImages();
+  assert.equal(g.$('#levelTitle').textContent, levels[0].title);
+  assert.equal(g.$('#timer').textContent, '02:00');
+  assert.equal(g.$('#foundCount').textContent, '0');
+  assert.equal(g.window.document.querySelectorAll('#levelTracker .completed').length, 0);
+  assert.equal(g.intervals.size, 1);
 });
 
-test('two hints identify distinct unfinished answers and never increase the score', (t) => {
-  const g = game(t);
-  g.click('#startButton');
-  g.hit('fruit');
-  g.click('#hintButton');
-  g.click('#hintButton');
-  const ids = new Set([...g.window.document.querySelectorAll('.hint')].map((spot) => spot.dataset.id));
-  assert.equal(ids.size, 2);
-  assert.equal(ids.has('fruit'), false);
+test('losing level two retries that level and preserves the completed first level', async (t) => {
+  const g = await game(t);
+  g.click('#startButton'); g.win(0); g.click('#playAgain'); await g.loadImages();
+  g.hit(levels[1].differences[0].id);
+  g.advance(120_000);
+  assert.equal(g.$('#resultLabel').textContent, 'หมดเวลา');
+  assert.equal(g.$('#playAgain').textContent, 'ลองด่านนี้อีกครั้ง');
+  assert.equal(g.window.document.querySelectorAll('.revealed').length, 8);
+  g.click('#playAgain');
+  assert.equal(g.$('#levelTitle').textContent, levels[1].title);
+  assert.equal(g.$('#timer').textContent, '02:00');
+  assert.equal(g.$('#foundCount').textContent, '0');
+  assert.equal(g.window.document.querySelectorAll('#levelTracker .completed').length, 1);
+  g.win(1);
+  assert.equal(g.$('#playAgain').textContent, 'ไปด่านที่ 3');
+});
+
+test('hints are distinct, exclude found answers and reset when the next scene loads', async (t) => {
+  const g = await game(t);
+  g.click('#startButton'); g.hit(first()); g.click('#hintButton'); g.click('#hintButton');
+  const hintIds = new Set([...g.window.document.querySelectorAll('.hint')].map((spot) => spot.dataset.id));
+  assert.equal(hintIds.size, 2);
+  assert.equal(hintIds.has(first()), false);
   assert.equal(g.$('#foundCount').textContent, '1');
   assert.equal(g.$('#hintCount').textContent, '0');
   assert.equal(g.$('#hintButton').disabled, true);
-  g.click('#hintButton');
-  assert.equal(g.$('#hintCount').textContent, '0');
+  g.win(0); g.click('#playAgain'); await g.loadImages();
+  assert.equal(g.$('#hintCount').textContent, '2');
+  assert.equal(g.$('.hint'), null);
+  assert.equal(g.$('.found'), null);
+  assert.equal(g.window.document.querySelectorAll('.hotspot').length, 10);
+  assert.equal(g.$(`[data-id="${first()}"]`), null);
+  assert.equal(g.$('.hotspot').getAttribute('aria-label'), 'จุดแตกต่างที่ 1');
 });
 
-test('pause and backgrounding preserve remaining time and require manual resume', (t) => {
-  const g = game(t);
-  g.click('#startButton');
-  g.advance(12_400);
-  g.click('#startButton');
+test('pause and backgrounding preserve exact remaining time and require manual resume', async (t) => {
+  const g = await game(t);
+  g.click('#startButton'); g.advance(12_400); g.click('#startButton');
   assert.equal(g.$('#timer').textContent, '01:48');
-  g.advance(180_000);
-  assert.equal(g.$('#timer').textContent, '01:48');
-  g.hit('fruit');
+  g.advance(180_000); g.hit(first());
   assert.equal(g.$('#foundCount').textContent, '0');
-  g.click('#startButton');
-  g.advance(600);
+  g.click('#startButton'); g.advance(600);
   assert.equal(g.$('#timer').textContent, '01:47');
   Object.defineProperty(g.window.document, 'hidden', { configurable: true, value: true });
   g.window.document.dispatchEvent(new g.window.Event('visibilitychange'));
@@ -122,34 +189,34 @@ test('pause and backgrounding preserve remaining time and require manual resume'
   assert.equal(g.intervals.size, 0);
 });
 
-test('a delayed last click cannot win after the deadline, even without interval callbacks', (t) => {
-  const g = game(t);
+test('a next-level image load completing in a hidden tab does not start its timer', async (t) => {
+  const g = await game(t);
+  g.click('#startButton'); g.win(0); g.click('#playAgain');
+  Object.defineProperty(g.window.document, 'hidden', { configurable: true, value: true });
+  await g.loadImages();
+  g.advance(180_000);
+  assert.equal(g.$('.pictures').dataset.state, 'ready');
+  assert.equal(g.$('#timer').textContent, '02:00');
+  assert.equal(g.intervals.size, 0);
+});
+
+test('a late last answer cannot win after the deadline even if timer callbacks are delayed', async (t) => {
+  const g = await game(t);
   g.click('#startButton');
-  answerIds.slice(0, 4).forEach((id) => g.hit(id));
+  levels[0].differences.slice(0, 4).forEach((point) => g.hit(point.id));
   g.advance(120_001, false);
-  g.hit('cart');
+  g.hit(levels[0].differences[4].id);
   assert.equal(g.$('#foundCount').textContent, '4');
   assert.equal(g.$('#timer').textContent, '00:00');
-  assert.equal(g.$('#resultTitle').textContent, 'หมดเวลาแล้ว!');
   assert.equal(g.$('#resultLabel').textContent, 'หมดเวลา');
-  assert.equal(g.$('#resultModal').hidden, false);
   assert.equal(g.window.document.querySelectorAll('.revealed').length, 2);
   g.advance(180_000);
   assert.equal(g.$('#timer').textContent, '00:00');
-  g.click('#closeResult');
-  assert.equal(g.$('#resultModal').hidden, true);
-  assert.equal(g.window.document.activeElement, g.$('#startButton'));
-  g.click('#startButton');
-  assert.equal(g.$('#timer').textContent, '02:00');
 });
 
-test('restart clears transient feedback and timers without a late result appearing', (t) => {
-  const g = game(t);
-  g.click('#startButton');
-  g.hit('fruit');
-  g.click('#hintButton');
-  g.click('#playScene');
-  g.click('#restartButton');
+test('restarting a round clears transient feedback without a late result appearing', async (t) => {
+  const g = await game(t);
+  g.click('#startButton'); g.hit(first()); g.click('#hintButton'); g.click('#playScene'); g.click('#restartButton');
   assert.equal(g.$('.pictures').dataset.state, 'ready');
   assert.equal(g.$('.miss'), null);
   assert.equal(g.$('.found'), null);
@@ -160,10 +227,9 @@ test('restart clears transient feedback and timers without a late result appeari
   assert.equal(g.intervals.size, 0);
 });
 
-test('result dialog traps Tab and closes with Escape, returning focus to the game', (t) => {
-  const g = game(t);
-  g.click('#startButton');
-  g.advance(120_000);
+test('result dialog traps Tab, closes with Escape and returns focus to the game', async (t) => {
+  const g = await game(t);
+  g.click('#startButton'); g.advance(120_000);
   g.$('#playAgain').dispatchEvent(new g.window.KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
   assert.equal(g.window.document.activeElement, g.$('#closeResult'));
   g.$('#closeResult').dispatchEvent(new g.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
@@ -173,9 +239,9 @@ test('result dialog traps Tab and closes with Escape, returning focus to the gam
   assert.equal(g.window.document.activeElement, g.$('#startButton'));
 });
 
-test('sound creates real audio tones when enabled, and muting stops new tones', async (t) => {
+test('sound uses real audio tones when enabled, while mute prevents further tones', async (t) => {
   let tones = 0;
-  const g = game(t, (window) => {
+  const g = await game(t, { configure(window) {
     window.AudioContext = class {
       state = 'suspended'; currentTime = 0; destination = {};
       async resume() { this.state = 'running'; }
@@ -183,80 +249,82 @@ test('sound creates real audio tones when enabled, and muting stops new tones', 
       createOscillator() { return { frequency: { setValueAtTime() {} }, connect() {}, disconnect() {}, start() { tones++; }, stop() {} }; }
       createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, disconnect() {} }; }
     };
-  });
-  g.click('#soundToggle');
-  await new Promise(setImmediate);
+  } });
+  g.click('#soundToggle'); await flush();
   assert.equal(g.$('#soundToggle').getAttribute('aria-pressed'), 'true');
   assert.ok(tones > 0);
   const previewTones = tones;
-  g.click('#startButton');
-  g.hit('fruit');
+  g.click('#startButton'); g.hit(first());
   assert.ok(tones > previewTones);
-  g.click('#soundToggle');
-  await new Promise(setImmediate);
-  assert.equal(g.$('#soundToggle').getAttribute('aria-pressed'), 'false');
+  g.click('#soundToggle'); await flush();
   const mutedTones = tones;
-  g.hit('shelf');
+  g.hit(levels[0].differences[1].id);
   assert.equal(tones, mutedTones);
 });
 
-test('unsupported audio does not prevent completing the game', async (t) => {
-  const g = game(t);
-  g.click('#soundToggle');
-  await new Promise(setImmediate);
+test('unsupported audio does not prevent completing a level', async (t) => {
+  const g = await game(t);
+  g.click('#soundToggle'); await flush();
   assert.equal(g.$('#soundToggle').getAttribute('aria-pressed'), 'false');
   assert.equal(g.$('#soundToggle').disabled, false);
-  g.click('#startButton');
-  answerIds.forEach((id) => g.hit(id));
+  g.click('#startButton'); g.win(0);
   assert.equal(g.$('#foundCount').textContent, '5');
 });
 
-test('the scenes contain exactly the five advertised differences, with no extra box seam', (t) => {
-  const g = game(t);
-  const original = g.$('[data-scene="original"] svg').cloneNode(true);
-  const different = g.$('[data-scene="different"] svg').cloneNode(true);
-  // Neutralize exactly the five intentional differences, then compare all artwork.
-  different.querySelector('circle[cx="144"]').setAttribute('fill', '#dd4b3d');
-  different.querySelector('rect[x="501"]').setAttribute('fill', '#cf1727');
-  const price = [...different.querySelectorAll('text')].find((node) => node.textContent === '89.-');
-  price.textContent = '99.-';
-  original.querySelector('rect[x="427"]').remove();
-  original.querySelector('rect[x="439"]').remove();
-  const geometry = (svg) => [...svg.querySelectorAll('*')].filter((node) => !node.children.length).map((node) => ({
-    tag: node.tagName,
-    text: node.textContent,
-    attrs: [...node.attributes].filter((attr) => !['class', 'id'].includes(attr.name)).map((attr) => [attr.name, attr.value.replace(/(wall|floor)[AB]/g, '$1')]).sort(([a], [b]) => a.localeCompare(b))
-  }));
-  assert.deepEqual(geometry(original), geometry(different));
+test('each level uses two local photographs and exactly five bounded edit regions', async (t) => {
+  assert.equal(levels.length, 3);
+  const g = await game(t);
+  assert.equal(g.window.document.querySelector('svg.scene'), null);
+  for (let i = 0; i < levels.length; i++) {
+    const level = levels[i];
+    assert.equal(level.differences.length, 5);
+    assert.equal(new Set(level.differences.map((point) => point.id)).size, 5);
+    assert.notEqual(level.original, level.edited);
+    for (const path of [level.original, level.edited]) {
+      assert.ok(existsSync(resolve(root, path)), path);
+      assert.match(path, /^assets\/.+\.webp$/);
+      const bytes = readFileSync(resolve(root, path));
+      assert.equal(bytes.toString('ascii', 0, 4), 'RIFF');
+      assert.equal(bytes.toString('ascii', 8, 12), 'WEBP');
+    }
+    assert.equal(g.$('#originalImage').getAttribute('src'), level.original);
+    assert.equal(g.$('#comparisonImage').getAttribute('src'), level.original);
+    assert.equal(g.$('#differenceImage').getAttribute('src'), level.edited);
+    assert.equal((g.$('#differenceImage').style.maskImage.match(/radial-gradient/g) || []).length, 5);
+    level.differences.forEach((point) => {
+      assert.ok(point.x - point.width / 2 >= 0 && point.x + point.width / 2 <= 100);
+      assert.ok(point.y - point.height / 2 >= 0 && point.y + point.height / 2 <= 100);
+    });
+    if (i === 0) g.click('#startButton');
+    g.win(i);
+    if (i < 2) { g.click('#playAgain'); await g.loadImages(); }
+  }
 });
 
-test('answer centers remain tappable without another target covering them at phone and desktop widths', (t) => {
-  const g = game(t);
-  const centers = { fruit: [144, 188], shelf: [445.5, 162.5], price: [592, 122], shirt: [535.5, 292], cart: [451, 286] };
-  const spots = [...g.$('#playScene').querySelectorAll('.hotspot')];
-  for (const width of [290, 340, 390, 540]) {
-    const height = width * 430 / 700;
-    const bounds = spots.map((spot) => ({
-      id: spot.dataset.id,
-      x: parseFloat(spot.style.getPropertyValue('--x')) / 100 * width,
-      y: parseFloat(spot.style.getPropertyValue('--y')) / 100 * height,
-      size: Math.max(44, parseFloat(spot.style.getPropertyValue('--size')) / 100 * width)
-    }));
-    for (const [id, [x, y]] of Object.entries(centers)) {
-      const hit = bounds.filter((box) => Math.abs(x / 700 * width - box.x) <= box.size / 2 && Math.abs(y / 430 * height - box.y) <= box.size / 2);
-      assert.deepEqual(hit.map((box) => box.id), [id], `${id} at width ${width}`);
+test('touch targets remain separate at their answer centers across mobile and desktop image sizes', () => {
+  for (const level of levels) {
+    for (const width of [290, 340, 390, 540]) {
+      const height = width * level.height / level.width;
+      const boxes = level.differences.map((point) => ({
+        id: point.id, x: point.x / 100 * width, y: point.y / 100 * height,
+        size: Math.max(44, (point.targetSize || Math.max(6, point.width * 0.7)) / 100 * width)
+      }));
+      for (const target of boxes) {
+        const hits = boxes.filter((box) => Math.abs(target.x - box.x) <= box.size / 2 && Math.abs(target.y - box.y) <= box.size / 2);
+        assert.deepEqual(hits.map((box) => box.id), [target.id], `${level.id}/${target.id} at ${width}px`);
+      }
     }
   }
 });
 
-test('entrypoint assets and internal navigation links exist for direct files and project subpaths', (t) => {
-  const g = game(t);
+test('entrypoint assets and internal links resolve under a GitHub project path', async (t) => {
+  const g = await game(t);
   for (const element of g.window.document.querySelectorAll('script[src], link[href], a[href]')) {
     const ref = element.getAttribute('src') || element.getAttribute('href');
     if (ref.startsWith('https://') || ref === '#') continue;
     if (ref.startsWith('#')) assert.ok(g.window.document.getElementById(ref.slice(1)), ref);
     else {
-      assert.ok(!ref.startsWith('/'), `project Pages requires a relative asset: ${ref}`);
+      assert.ok(!ref.startsWith('/'), ref);
       assert.ok(existsSync(resolve(root, ref.split('?')[0])), ref);
     }
   }
