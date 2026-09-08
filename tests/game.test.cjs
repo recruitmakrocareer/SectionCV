@@ -321,11 +321,45 @@ test('entrypoint assets and internal links resolve under a GitHub project path',
   const g = await game(t);
   for (const element of g.window.document.querySelectorAll('script[src], link[href], a[href]')) {
     const ref = element.getAttribute('src') || element.getAttribute('href');
-    if (ref.startsWith('https://') || ref === '#') continue;
+    if (ref.startsWith('https://') || ref === '#' || ref.startsWith('auth/')) continue;
     if (ref.startsWith('#')) assert.ok(g.window.document.getElementById(ref.slice(1)), ref);
     else {
       assert.ok(!ref.startsWith('/'), ref);
       assert.ok(existsSync(resolve(root, ref.split('?')[0])), ref);
     }
   }
+});
+
+test('the start popup is visible before play, waits for images, then releases the game', async (t) => {
+  const g = await game(t, { load: false });
+  assert.equal(g.$('#startModal').hidden, false);
+  assert.equal(g.$('#startButton').hidden, true);
+  assert.equal(g.$('#popupStartButton').disabled, true);
+  g.advance(30000);
+  await g.loadImages();
+  assert.equal(g.$('#popupStartButton').disabled, false);
+  assert.equal(g.window.document.activeElement, g.$('#popupStartButton'));
+  g.click('#popupStartButton');
+  assert.equal(g.$('#startModal').hidden, true);
+  assert.equal(g.$('main').inert, false);
+  assert.equal(g.$('.pictures').dataset.state, 'playing');
+});
+
+test('wrong taps add five seconds to total score without granting extra playing time', async (t) => {
+  const g = await game(t);
+  g.click('#popupStartButton');
+  g.advance(10000);
+  g.click('#playScene'); g.click('#playScene');
+  assert.equal(g.$('#timer').textContent, '01:50');
+  assert.equal(g.$('#scoreTime').textContent, '00:20.00');
+  assert.match(g.$('#penaltySummary').textContent, /2 ครั้ง · \+10/);
+  g.click('#startButton'); // paused taps do not incur penalties
+  g.click('#playScene');
+  assert.equal(g.$('#scoreTime').textContent, '00:20.00');
+  g.click('#startButton');
+  g.win(0); g.click('#playAgain'); await g.loadImages();
+  g.advance(20000); g.win(1); g.click('#playAgain'); await g.loadImages();
+  g.advance(30000); g.win(2);
+  assert.match(g.$('#resultMessage').textContent, /01:00.00.*10.*01:10.00/);
+  assert.equal(g.$('#scoreTime').textContent, '01:10.00');
 });

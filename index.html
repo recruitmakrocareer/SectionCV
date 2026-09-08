@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260908-photos1">
+  <link rel="stylesheet" href="styles.css?v=20260908-players1">
 </head>
 <body>
   <header class="site-header">
@@ -16,6 +16,7 @@
     <nav aria-label="เมนูหลัก">
       <a class="active" href="#game">หน้าแรก</a>
       <a href="#howto">วิธีเล่น</a>
+      <a href="#leaderboard">10 อันดับแรก</a>
     </nav>
     <button class="sound-button" id="soundToggle" aria-label="เปิดหรือปิดเสียง" aria-pressed="false">
       <span id="soundIcon">♪</span><span class="sound-label">เสียง</span>
@@ -27,18 +28,19 @@
       <div class="sparkle sparkle-one">✦</div><div class="sparkle sparkle-two">✦</div>
       <p class="kicker">3 ด่าน · 15 จุดต่าง</p>
       <h1>เกม<span>จับผิดภาพ</span></h1>
-      <p class="hero-copy">ภาพเสมือนจริง รายละเอียดแน่นขึ้น · ด่านละ 5 จุด ใน 2 นาที</p>
+      <p class="hero-copy">3 ด่าน · ด่านละ 5 จุด ใน 2 นาที · กดผิดบวกเวลาจัดอันดับครั้งละ 5 วินาที</p>
       <div class="game-stats">
         <div class="stat"><span class="stat-icon clock-icon">◷</span><div><small>เวลาที่เหลือ</small><strong id="timer" role="timer" aria-label="เวลาที่เหลือ">02:00</strong></div></div>
         <div class="divider"></div>
         <div class="stat"><span class="stat-icon target-icon">◎</span><div><small>พบในด่านนี้</small><strong><span id="foundCount">0</span><em>/5 จุด</em></strong></div></div>
       </div>
+      <div class="score-strip"><span>เวลาจัดอันดับ <b id="scoreTime">00:00.00</b></span><span id="penaltySummary">กดผิด 0 ครั้ง · +0 วินาที</span><span id="playerBadge">ฝึกซ้อม · ไม่บันทึกอันดับ</span></div>
     </section>
 
     <section class="game-card" aria-label="เกมจับผิดภาพ">
       <div class="play-controls">
         <p id="gameStatus" role="status">กำลังเตรียมภาพด่านที่ 1…</p>
-        <div class="control-buttons"><button id="startButton" type="button" class="primary-button" disabled>กำลังโหลดภาพ…</button><button id="restartButton" type="button" class="secondary-button" disabled>เริ่มด่านนี้ใหม่</button></div>
+        <div class="control-buttons"><button id="startButton" type="button" class="primary-button" hidden disabled>กำลังโหลดภาพ…</button><button id="restartButton" type="button" class="secondary-button" disabled>เริ่มด่านนี้ใหม่</button><button id="accountButton" type="button" class="secondary-button">ข้อมูลผู้เล่น</button></div>
       </div>
       <noscript><p class="no-script">กรุณาเปิด JavaScript ในเบราว์เซอร์เพื่อเล่นเกมนี้</p></noscript>
       <ol class="level-tracker" id="levelTracker" aria-label="ความคืบหน้า 3 ด่าน"></ol>
@@ -65,6 +67,13 @@
       <div class="game-actions"><p><span>💡</span> แตะจุดต่างได้ทั้งสองภาพ<span class="zoom-tip">ใช้สองนิ้วซูมเพื่อดูรายละเอียด</span></p><button id="hintButton" type="button" disabled><span>◎</span> ใช้คำใบ้ <b id="hintCount">2</b></button></div>
     </section>
 
+    <section class="leaderboard-card" id="leaderboard" aria-labelledby="leaderboardTitle">
+      <div class="leaderboard-heading"><div><p class="section-kicker">TOP 10</p><h2 id="leaderboardTitle">10 อันดับเวลาที่ดีที่สุด</h2></div><button id="refreshLeaderboard" class="secondary-button" type="button">อัปเดตอันดับ</button></div>
+      <p>เวลารวมทั้ง 3 ด่าน + กดผิดครั้งละ 5 วินาที · เก็บสถิติที่ดีที่สุดคนละ 1 อันดับ</p>
+      <p id="leaderboardStatus" role="status">กำลังโหลดอันดับ…</p>
+      <div class="table-scroll"><table id="leaderboardTable" hidden><thead><tr><th scope="col">อันดับ</th><th scope="col">ผู้เล่น</th><th scope="col">เวลารวม</th><th scope="col">กดผิด</th></tr></thead><tbody id="leaderboardRows"></tbody></table></div>
+      <p class="privacy-caption">แสดงเฉพาะชื่อและสถิติการเล่น เบอร์ติดต่อดูได้เฉพาะผู้ดูแลกิจกรรม</p>
+    </section>
     <section class="how-to" id="howto">
       <p class="section-kicker">HOW TO PLAY</p><h2>วิธีเล่นง่าย ๆ</h2>
       <div class="steps"><article><b>1</b><span>👀</span><h3>สังเกตภาพ</h3><p>เปรียบเทียบภาพทั้งสองด้าน<br>อย่างละเอียด</p></article><i></i><article><b>2</b><span>☝️</span><h3>แตะจุดต่าง</h3><p>เจอแล้วแตะที่ตำแหน่ง<br>ในภาพใดก็ได้</p></article><i></i><article><b>3</b><span>🎉</span><h3>ค้นหาให้ครบ</h3><p>หาครบ 5 จุดแล้วไปด่านถัดไป<br>ผ่านให้ครบทั้ง 3 ด่าน</p></article></div>
@@ -73,13 +82,34 @@
 
   <footer><a class="logo footer-logo" href="#">makro<span>.</span></a><p>สนุกทุกช้อป คุ้มทุกวัน ที่แม็คโคร</p><small>Makro · เกมจับผิดภาพเสมือนจริง</small></footer>
 
+  <div class="modal start-modal" id="startModal">
+    <div class="modal-card start-card" role="dialog" aria-modal="true" aria-labelledby="startTitle" aria-describedby="startRules">
+      <p class="section-kicker">MAKRO PHOTO CHALLENGE</p><h2 id="startTitle">พร้อมจับผิดภาพแล้วหรือยัง?</h2>
+      <p id="startRules">หาจุดต่างให้ครบ 15 จุดใน 3 ด่าน<br>กดผิด 1 ครั้ง <strong>+5 วินาที</strong> ในเวลาจัดอันดับ</p>
+      <div class="start-facts"><span>ด่านละ <b>2 นาที</b></span><span>คำใบ้ <b>2 ครั้ง/ด่าน</b></span><span>ยิ่งเร็ว <b>อันดับยิ่งดี</b></span></div>
+      <div id="loginPanel"><p id="loginStatus" role="status">กำลังตรวจการเข้าสู่ระบบ…</p><a id="lineLogin" class="line-button" href="auth/line/start" hidden>เข้าสู่ระบบด้วย LINE</a></div>
+      <form id="playerForm" hidden>
+        <p id="lineIdentity"></p>
+        <label for="playerName">ชื่อที่ใช้ในกิจกรรมและตารางอันดับ</label><input id="playerName" name="name" autocomplete="name" minlength="2" maxlength="80" required>
+        <label for="playerPhone">เบอร์ติดต่อ</label><input id="playerPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="08x xxx xxxx" maxlength="20" required>
+        <p class="privacy-caption">ใช้ข้อมูลเพื่อระบุตัวผู้เล่น บันทึกสถิติ และติดต่อเกี่ยวกับกิจกรรมนี้ เบอร์โทรไม่แสดงต่อผู้เล่นอื่น</p>
+        <label class="consent-row"><input id="playerConsent" type="checkbox" required><span>ยินยอมให้จัดเก็บชื่อ เบอร์ติดต่อ และสถิติตามวัตถุประสงค์ข้างต้น</span></label>
+        <button id="savePlayer" type="submit" class="secondary-button">บันทึกข้อมูลผู้เล่น</button>
+      </form>
+      <p id="profileStatus" role="status"></p>
+      <button id="popupStartButton" type="button" class="start-cta" disabled>กำลังโหลดภาพ…</button>
+      <p id="startModeNote" class="privacy-caption">รอภาพพร้อมก่อนเริ่มจับเวลา</p>
+      <div class="account-actions"><button id="logoutButton" class="secondary-button" type="button" hidden>ออกจากระบบ</button><a id="adminLink" href="admin.html" hidden>ดูข้อมูลผู้เล่น</a></div>
+    </div>
+  </div>
   <div class="modal" id="resultModal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultMessage">
-      <div class="trophy" id="resultIcon" aria-hidden="true">🏆</div><p class="section-kicker" id="resultLabel">พบครบแล้ว!</p><h2 id="resultTitle">เก่งมาก! คุณเจอครบแล้ว</h2><p id="resultMessage">คุณตามหาจุดแตกต่างครบทั้ง 5 จุดได้สำเร็จ</p><div class="result-actions"><button id="playAgain" type="button">เล่นอีกครั้ง</button><button id="closeResult" type="button" class="secondary-button">กลับไปดูภาพ</button></div>
+      <div class="trophy" id="resultIcon" aria-hidden="true">🏆</div><p class="section-kicker" id="resultLabel">พบครบแล้ว!</p><h2 id="resultTitle">เก่งมาก! คุณเจอครบแล้ว</h2><p id="resultMessage">คุณตามหาจุดแตกต่างครบทั้ง 5 จุดได้สำเร็จ</p><p id="saveScoreStatus" role="status"></p><button id="retryScore" type="button" class="secondary-button" hidden>ลองบันทึกสถิติอีกครั้ง</button><div class="result-actions"><button id="playAgain" type="button">เล่นอีกครั้ง</button><button id="closeResult" type="button" class="secondary-button">กลับไปดูภาพ</button></div>
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="levels.js?v=20260908-photos1"></script>
-  <script src="app.js?v=20260908-photos1"></script>
+  <script src="account.js?v=20260908-players1"></script>
+  <script src="app.js?v=20260908-players1"></script>
 </body>
 </html>

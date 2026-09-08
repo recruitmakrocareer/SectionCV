@@ -1,2 +1,8 @@
 node_modules/
 _site/
+data/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*

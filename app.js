@@ -14,6 +14,16 @@
   const startButton = $('#startButton');
   const restartButton = $('#restartButton');
   const modal = $('#resultModal');
+  const startModal = $('#startModal');
+  const popupStartButton = $('#popupStartButton');
+  const account = window.MAKRO_ACCOUNT;
+  const penaltyMs = 5000;
+  const completedMisses = Array(levels.length).fill(0);
+  let misses = 0;
+  let starting = false;
+  let campaignStarted = false;
+  let ranked = false;
+  let resultGeneration = 0;
   const soundToggle = $('#soundToggle');
   const background = [$('header'), $('main'), $('footer')];
   const completed = Array(levels.length).fill(null);
@@ -40,6 +50,46 @@
     const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
     return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   };
+
+  const formatScore = (ms) => {
+    const n = Math.max(0, Math.round(ms / 10));
+    return `${String(Math.floor(n / 6000)).padStart(2, '0')}:${String(Math.floor(n / 100) % 60).padStart(2, '0')}.${String(n % 100).padStart(2, '0')}`;
+  };
+  const totalMisses = () => completedMisses.reduce((sum, n) => sum + n, 0) + (completed[levelIndex] === null ? misses : 0);
+  const score = () => completed.reduce((sum, n) => sum + (n || 0), 0) + (completed[levelIndex] === null ? duration - remaining : 0) + totalMisses() * penaltyMs;
+  function syncBackground() {
+    background.forEach((element) => { element.inert = !modal.hidden || !startModal.hidden; });
+  }
+  function openStart() {
+    modal.hidden = true;
+    startModal.hidden = false;
+    syncBackground();
+    render();
+    if (!popupStartButton.disabled) popupStartButton.focus();
+  }
+  function closeStart() { startModal.hidden = true; syncBackground(); }
+  function record(type, data) {
+    if (!ranked) return;
+    account.event(type, data).catch(() => {
+      showToast('การเชื่อมต่อสะดุด กำลังเก็บรายการที่รอส่งไว้ในรอบนี้');
+    });
+  }
+  async function saveScore() {
+    const generation = resultGeneration;
+    $('#retryScore').hidden = true;
+    if (!ranked) { $('#saveScoreStatus').textContent = 'โหมดฝึกซ้อม · ไม่บันทึกอันดับ'; return; }
+    $('#saveScoreStatus').textContent = 'กำลังบันทึกสถิติ… กรุณาอย่าเพิ่งปิดหน้านี้';
+    try {
+      const result = await account.saveResult();
+      if (generation !== resultGeneration) return;
+      $('#saveScoreStatus').textContent = `บันทึกแล้ว · เวลาจัดอันดับ ${formatScore(result.scoreMs)}${result.rank ? ` · อันดับที่ ${result.rank}` : ''}`;
+      $('#scoreTime').textContent = formatScore(result.scoreMs);
+    } catch (error) {
+      if (generation !== resultGeneration) return;
+      $('#saveScoreStatus').textContent = `ยังบันทึกสถิติไม่สำเร็จ: ${error.message}`;
+      $('#retryScore').hidden = false;
+    }
+  }
 
   function showToast(message) {
     $('#toast').textContent = message;
@@ -107,11 +157,14 @@
   });
 
   function nextActionLabel() {
+    if (!roundWon && ranked) return 'เริ่มใหม่ทั้ง 3 ด่าน';
     if (!roundWon) return 'ลองด่านนี้อีกครั้ง';
     return levelIndex < levels.length - 1 ? `ไปด่านที่ ${levelIndex + 2}` : 'เริ่มใหม่ทั้ง 3 ด่าน';
   }
 
   function render() {
+    $('#scoreTime').textContent = formatScore(score());
+    $('#penaltySummary').textContent = `กดผิด ${totalMisses()} ครั้ง · +${totalMisses() * 5} วินาที`;
     timerEl.textContent = formatTime(remaining);
     timerEl.classList.toggle('urgent', phase === 'playing' && Math.ceil(remaining / 1000) <= 10);
     $('#foundCount').textContent = found.size;
@@ -126,12 +179,16 @@
       playing: 'หยุดพัก', paused: 'เล่นต่อ', finished: nextActionLabel()
     }[phase];
     startButton.disabled = phase === 'loading';
+    startButton.hidden = ['loading', 'error', 'ready'].includes(phase);
+    popupStartButton.disabled = starting || phase === 'loading' || (account && !account.canPlay());
+    popupStartButton.textContent = starting ? 'กำลังเตรียมเกม…' : phase === 'loading' ? 'กำลังโหลดภาพ…' : phase === 'error' ? 'ลองโหลดภาพอีกครั้ง' : phase === 'paused' ? 'เล่นต่อ' : phase === 'finished' ? nextActionLabel() : account?.state.lineReady ? `เริ่มเกม · ด่านที่ ${levelIndex + 1}` : `เริ่มเกมฝึกซ้อม · ด่านที่ ${levelIndex + 1}`;
+    restartButton.textContent = ranked ? 'เริ่มใหม่ทั้ง 3 ด่าน' : 'เริ่มด่านนี้ใหม่';
     restartButton.disabled = ['loading', 'error', 'ready'].includes(phase);
     const status = {
       loading: `กำลังเตรียมภาพด่านที่ ${levelIndex + 1}…`,
       error: 'โหลดภาพไม่สำเร็จ ตรวจการเชื่อมต่อแล้วแตะลองโหลดภาพอีกครั้ง',
       ready: `ด่านที่ ${levelIndex + 1} / ${levels.length} · พร้อมแล้วแตะเริ่มด่าน · 5 จุดใน 2 นาที`,
-      playing: 'แตะจุดต่างในภาพใดก็ได้ · คำใบ้ 2 ครั้งต่อด่าน',
+      playing: 'กดผิด +5 วินาทีในเวลาจัดอันดับ · คำใบ้ 2 ครั้งต่อด่าน',
       paused: 'หยุดพักแล้ว · แตะเล่นต่อเมื่อพร้อม',
       finished: roundWon ? (levelIndex === levels.length - 1 ? 'ผ่านครบทั้ง 3 ด่านแล้ว!' : `ผ่านด่านที่ ${levelIndex + 1} แล้ว · ไปต่อด่านถัดไปได้เลย`) : 'หมดเวลาแล้ว · ลองด่านนี้ใหม่ได้เลย'
     }[phase];
@@ -160,7 +217,7 @@
 
   function closeResult() {
     modal.hidden = true;
-    background.forEach((element) => { element.inert = false; });
+    syncBackground();
     if (!startButton.disabled) startButton.focus();
   }
 
@@ -169,20 +226,25 @@
     phase = 'finished';
     roundWon = won;
     clearInterval(timer);
-    if (won) completed[levelIndex] = duration - remaining;
+    if (won) { completed[levelIndex] = duration - remaining; completedMisses[levelIndex] = misses; }
+    else record('timeout');
     const finishedAll = completed.every((elapsed) => elapsed !== null);
     render();
     $('#resultIcon').textContent = won ? '🏆' : '⏰';
     $('#resultLabel').textContent = finishedAll ? 'สำเร็จทั้ง 3 ด่าน' : won ? `ผ่านด่านที่ ${levelIndex + 1}` : 'หมดเวลา';
     $('#resultTitle').textContent = finishedAll ? 'สุดยอด! พบครบทั้ง 15 จุด' : won ? 'เก่งมาก! เจอครบ 5 จุดแล้ว' : 'ลองอีกครั้งนะ!';
     $('#resultMessage').textContent = finishedAll
-      ? `ผ่านครบ ${levels.length} ด่าน ใช้เวลารวม ${formatTime(completed.reduce((sum, elapsed) => sum + elapsed, 0))}`
+      ? `เวลาจริง ${formatScore(completed.reduce((sum, elapsed) => sum + elapsed, 0))} + เวลาปรับ ${totalMisses() * 5} วินาที = ${formatScore(score())}`
       : won
         ? `เหลือเวลา ${formatTime(remaining)} · ด่านถัดไป: ${levels[levelIndex + 1].title}`
         : `พบ ${found.size} จาก ${ids.length} จุด วงสีเหลืองแสดงจุดที่เหลือ ลองด่านนี้อีกครั้งได้โดยไม่ต้องกลับไปด่านแรก`;
     $('#playAgain').textContent = nextActionLabel();
     modal.hidden = false;
-    background.forEach((element) => { element.inert = true; });
+    startModal.hidden = true;
+    syncBackground();
+    $('#saveScoreStatus').textContent = !won && ranked ? 'รอบนี้ไม่บันทึกอันดับ เริ่มใหม่ทั้ง 3 ด่านเพื่อส่งสถิติ' : '';
+    $('#retryScore').hidden = true;
+    if (finishedAll) saveScore();
     $('#playAgain').focus();
     playSound(won ? 'win' : 'lose');
   }
@@ -196,12 +258,34 @@
   }
 
   function startGame() {
+    if (starting) return;
     if (phase !== 'ready' && phase !== 'paused') return;
+    const resuming = phase === 'paused';
+    if (!account) { campaignStarted = true; return activateGame(); }
+    if (!account.canPlay()) return openStart();
+    starting = true;
+    render();
+    (async () => {
+      if (!campaignStarted) { ranked = await account.startRun(); campaignStarted = true; }
+      if (ranked) await account.event(resuming ? 'resume' : 'begin', { level: levelIndex });
+      starting = false;
+      activateGame();
+      if (document.hidden) pauseGame();
+    })().catch((error) => {
+      starting = false;
+      $('#profileStatus').textContent = error.message;
+      openStart();
+    });
+  }
+
+  function activateGame() {
+    closeStart();
     phase = 'playing';
     deadline = performance.now() + remaining;
     clearInterval(timer);
     timer = setInterval(syncTime, 250);
     render();
+    startButton.focus();
     if (soundEnabled) audioContext.resume().catch(() => {});
     // Fetch the next scene only after play starts; current photos take priority.
     const next = levels[levelIndex + 1];
@@ -217,6 +301,7 @@
     if (!syncTime()) return;
     phase = 'paused';
     clearInterval(timer);
+    record('pause');
     render();
   }
 
@@ -230,6 +315,7 @@
     found = new Set();
     hinted = new Set();
     hints = 2;
+    misses = 0;
     remaining = duration;
     roundWon = false;
   }
@@ -238,9 +324,11 @@
     if (phase === 'loading' || phase === 'error') return;
     clearRound();
     completed[levelIndex] = null;
+    completedMisses[levelIndex] = 0;
     phase = 'ready';
     render();
     closeResult();
+    openStart();
   }
 
   function waitForImage(image, src) {
@@ -277,6 +365,7 @@
           event.stopPropagation();
           if (!syncTime() || found.has(spot.dataset.id)) return;
           found.add(spot.dataset.id);
+          record('hit', { answer: spot.dataset.id });
           render();
           if (found.size === ids.length) return endGame(true);
           showToast(`ถูกต้อง! พบแล้ว ${found.size} / ${ids.length} จุด 🎉`);
@@ -323,22 +412,32 @@
       phase = 'ready';
       render();
       if (autoStart && !document.hidden) startGame();
+      else openStart();
     }).catch(() => {
       if (generation !== loadGeneration) return;
       phase = 'error';
       render();
+      openStart();
     });
   }
 
   function proceed() {
     if (phase !== 'finished') return;
+    if (ranked && !roundWon) return resetCampaign();
     if (roundWon && levelIndex < levels.length - 1) return loadLevel(levelIndex + 1, true);
     if (roundWon) {
-      completed.fill(null);
-      return loadLevel(0, true);
+      return resetCampaign(true);
     }
     resetRound();
     startGame();
+  }
+
+  function resetCampaign(autoStart = false) {
+    resultGeneration += 1;
+    completed.fill(null);
+    completedMisses.fill(0);
+    campaignStarted = false;
+    return loadLevel(0, autoStart);
   }
 
   startButton.addEventListener('click', () => {
@@ -347,12 +446,27 @@
     if (phase === 'finished') return proceed();
     startGame();
   });
-  restartButton.addEventListener('click', resetRound);
+  popupStartButton.addEventListener('click', () => {
+    if (phase === 'error') return loadLevel(levelIndex);
+    if (phase === 'finished') return proceed();
+    startGame();
+  });
+  window.addEventListener('account:change', render);
+  $('#accountButton').addEventListener('click', () => {
+    if (phase === 'playing') pauseGame();
+    openStart();
+  });
+  $('#retryScore').addEventListener('click', saveScore);
+  restartButton.addEventListener('click', () => ranked ? resetCampaign() : resetRound());
   $('#playAgain').addEventListener('click', proceed);
   $('#closeResult').addEventListener('click', closeResult);
 
   [originalScene, playScene].forEach((scene) => scene.addEventListener('click', (event) => {
     if (event.target.closest('.hotspot') || !syncTime()) return;
+    misses += 1;
+    record('miss');
+    render();
+    showToast('กดผิด +5 วินาทีในเวลาจัดอันดับ');
     const rect = scene.getBoundingClientRect();
     const miss = document.createElement('span');
     miss.className = 'miss';
@@ -385,11 +499,20 @@
   modal.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') { event.preventDefault(); closeResult(); }
     if (event.key === 'Tab') {
-      const first = $('#playAgain');
-      const last = $('#closeResult');
+      const buttons = [...modal.querySelectorAll('button:not(:disabled)')].filter((button) => !button.hidden);
+      const first = buttons[0];
+      const last = buttons.at(-1);
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
+  });
+  startModal.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab') return;
+    const focusable = [...startModal.querySelectorAll('button:not(:disabled), a[href], input')].filter((el) => !el.hidden && !el.closest('[hidden]'));
+    const first = focusable[0]; const last = focusable.at(-1);
+    if (!first) { event.preventDefault(); return; }
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   });
 
   levels.forEach((entry, index) => {
@@ -402,5 +525,6 @@
     $('#levelTracker').appendChild(item);
   });
   updateSoundButton();
+  syncBackground();
   loadLevel(0);
 })();

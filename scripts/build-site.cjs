@@ -5,7 +5,8 @@ const root = resolve(__dirname, '..');
 const levels = require('../levels.js');
 // Publish only runtime assets, keeping tooling and dependencies out of Pages.
 const publicFiles = [
-  'index.html', 'app.js', 'levels.js', 'styles.css', '.nojekyll',
+  'index.html', 'app.js', 'account.js', 'levels.js', 'styles.css', '.nojekyll',
+  'admin.html', 'admin.js',
   'memory-game/index.html', 'docs/memory-game/index.html',
   ...levels.flatMap((level) => [level.original, level.edited])
 ];
