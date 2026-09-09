@@ -19,6 +19,7 @@
     {
       "binding": "DB",
       "database_name": "makro-player-data",
+      "database_id": "1adbee78-8771-44f9-bc9d-6e5c4d231b22",
       "migrations_dir": "migrations"
     }
   ]

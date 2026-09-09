@@ -6,7 +6,7 @@
 
 - โค้ดรองรับ LINE Login, ชื่อ/เบอร์ติดต่อ, อันดับรวม 10 คน, ป๊อปอัปเริ่มเกม และกดผิด +5 วินาที
 - ใช้ LINE Login Channel ID `2011516015` ตามที่ผู้ดูแลแจ้ง ยังไม่ได้ยืนยันการล็อกอินจริงกับ Channel นี้
-- ผู้ดูแลสร้าง Worker `sectioncv` และเชื่อม repository แล้ว ภาพหน้าจอวันที่ 9 กันยายน 2026 แสดงการ deploy จาก `main` เป็น static assets, `workers.dev` ปิด และยังไม่มี binding จึงยังไม่ได้เปิดระบบ LINE Login หรือฐานข้อมูลเกมจริง
+- ผู้ดูแลสร้าง Worker `sectioncv` และเชื่อม `DB` กับ D1 `makro-player-data` แล้ว บันทึก Database ID จริงจากภาพหน้าจอวันที่ 9 กันยายน 2026 ใน `wrangler.json` ภาพฐานข้อมูลล่าสุดยังมี 0 ตาราง จึงต้องรัน migration ผ่าน `npm run deploy` ก่อนเปิดระบบผู้เล่น การเผยแพร่ URL หลักและ LINE Login จริงยังไม่ได้ยืนยัน
 - [GitHub Pages เดิม](https://recruitmakrocareer.github.io/SectionCV/) ยังเป็น **โหมดฝึกซ้อมที่ไม่บันทึกอันดับ** ไม่มีข้อมูลผู้เล่นหรือบัญชี LINE จำลองในระบบจริง
 
 ## ขอบเขตแพ็กเกจฟรี
@@ -27,13 +27,13 @@
 
 ## ติดตั้งบน Cloudflare Free
 
-ไฟล์ `wrangler.json` ระบุ Worker หนึ่งตัวและ D1 หนึ่งฐานข้อมูล ไม่มีบริการแบบเสียเงินเพิ่ม และยังไม่มี database ID จริง การติดตั้งใหม่ต้องบันทึก ID ที่ Cloudflare ออกให้ไว้กับโครงการเพื่อให้ deploy ครั้งต่อไปใช้ฐานข้อมูลเดิม
+ไฟล์ `wrangler.json` ระบุ Worker `sectioncv` และฐานข้อมูลเดิม `makro-player-data` ด้วย Database ID `1adbee78-8771-44f9-bc9d-6e5c4d231b22` แล้ว การ deploy ในบัญชีนี้ใช้ฐานข้อมูลเดิมและ migration ที่มีอยู่ ไม่ต้องสร้างฐานข้อมูลใหม่
 
 ### ผ่านหน้า Cloudflare
 
 1. ตรวจว่า Workers เป็น **Free** แล้วเปิด Worker `sectioncv` ที่สร้างไว้ → **Settings → Build** ใช้ repository `recruitmakrocareer/SectionCV` และเปลี่ยน Git/Production branch เป็น `codex/create-makro-sprite-spot-the-difference-game` ซึ่งมีโค้ดเกมและชุดติดตั้งนี้ หากยังไม่ได้เชื่อม Builds ให้กด Connect แล้วเลือก repository และ branch เดียวกัน
 2. ชื่อ Worker ใน `wrangler.json` คือ `sectioncv` ตรงกับโครงการที่ผู้ดูแลสร้าง ตั้ง build command เป็น `npm run build`, deploy command เป็น `npm run deploy` และ root directory เป็นราก repository ใช้ Node.js 24 ขึ้นไปในสภาพแวดล้อม build ตัว deploy command จะสร้างตารางด้วย migration ก่อนเปิดเวอร์ชันใหม่ ต้องตั้งค่าฐานข้อมูลในข้อ 3 ให้เสร็จก่อนเริ่ม build
-3. Cloudflare สามารถสร้าง D1 binding ที่ยังไม่มี ID ให้ระหว่างตั้งค่าโครงการได้ หากหน้าติดตั้งยังไม่ได้สร้างฐานข้อมูล ให้สร้าง D1 `makro-player-data` ในบัญชี Free ก่อน แล้วนำ **Database ID จริง** ใส่ `d1_databases[0].database_id` ใน `wrangler.json` และบันทึกลง branch นี้ ห้ามใช้ ID ตัวอย่าง เมื่อระบบสร้างให้เองจากหน้าเว็บ ให้คัดลอก ID กลับมาเก็บในไฟล์นี้หลังติดตั้งด้วย
+3. ตรวจในแท็บ **Bindings** ว่า `DB` ชี้ไปยัง `makro-player-data` ที่มี ID ตรงกับไฟล์ `wrangler.json` ซึ่งตั้งค่าให้แล้ว ตรวจว่า API token ที่เลือกสำหรับ Workers Builds มีสิทธิ์ **Account → D1 → Edit** ในบัญชีนี้เพื่อรัน migration หาก build แจ้งไม่มีสิทธิ์ ให้แก้ token เดิมในบัญชี Cloudflare โดยตรง ไม่ส่ง token ในแชตหรือ GitHub จากนั้นเริ่ม build ของสาขาเกมด้วย deploy command `npm run deploy` และตรวจว่าขั้นตอน migration สำเร็จ
 4. หลัง deploy จาก branch เกมสำเร็จ ตรวจว่ามี D1 binding `DB` และ `workers.dev` เปิดใช้งาน (`workers_dev: true` เตรียมไว้ในไฟล์แล้ว) คัดลอก **URL HTTPS จริงที่ Cloudflare แสดง** แล้วไปที่ Worker → Settings → Variables and Secrets ตั้งค่าตามตารางด้านล่าง กดบันทึก/deploy ค่าตั้งแต่ละรายการ การสร้าง Worker หรือมีข้อความ Deploy สำเร็จจาก `main` เพียงอย่างเดียวยังไม่ยืนยันว่า API เกมพร้อม
 5. ใน LINE Developers ของ Channel `2011516015` → แท็บ **LINE Login** → **Callback URL** ใส่ `<URL จริงของ Worker>/auth/line/callback` ไม่มี `/` ซ้อนกัน ไม่ใช้ URL ของ GitHub Pages
 6. ทดสอบด้วยบัญชี Admin/Tester ของ Channel ก่อน: ล็อกอิน → กรอกชื่อ/เบอร์และยินยอม → เล่นครบสามด่าน → ตรวจอันดับและหน้าผู้ดูแล จากนั้นตั้ง Channel เป็น **Published** เมื่อพร้อมให้บุคคลทั่วไปใช้ แล้วแชร์ URL ของ Worker
@@ -56,16 +56,17 @@
 ```bash
 npm ci --ignore-scripts
 npx wrangler login
-npx wrangler d1 create makro-player-data
 ```
 
-ใส่ `database_id` จริงที่คำสั่งสร้างฐานข้อมูลคืนให้ใน binding `DB` ของ `wrangler.json` และ commit ค่านี้ (ID ไม่ใช่ Secret) จากนั้น:
+ตรวจว่าเข้าสู่บัญชีที่มีฐานข้อมูล `makro-player-data` ตาม ID ใน `wrangler.json` แล้ว จากนั้น:
 
 ```bash
 npm run deploy
 ```
 
 ตั้งค่าบน dashboard และตั้ง Callback URL ตามขั้นตอนด้านบน การ deploy ครั้งต่อไปใช้คำสั่งเดิมและฐานข้อมูลเดิม คำสั่ง migrations บันทึกว่าเคยสร้างตารางแล้ว ไม่ล้างผลการเล่น
+
+หากนำโครงการไปติดตั้งในอีกบัญชี ให้สร้าง D1 ของบัญชีนั้นและเปลี่ยน `database_id` เป็น ID จริงที่ Cloudflare ออกให้ก่อน deploy; ID ในโครงการนี้เป็นของบัญชีผู้ดูแลเกมปัจจุบัน
 
 ## ทดสอบในเครื่อง
 

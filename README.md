@@ -12,7 +12,7 @@
 
 ดูขั้นตอนเปิดใช้งานและข้อกำหนดการเก็บข้อมูลใน [SETUP-LINE.md](SETUP-LINE.md)
 
-เลือกใช้ **Cloudflare Workers Free + D1 Free** ตามที่ผู้ดูแลต้องการ ไม่มีค่าเช่าเครื่องรายเดือนและใช้ URL `workers.dev` ที่ให้ฟรี ไฟล์ [wrangler.json](wrangler.json) ใช้ชื่อ `sectioncv` ตรงกับ Worker ที่ผู้ดูแลสร้างแล้ว ยังต้องเปลี่ยนสาขา deploy เป็นสาขาเกม, เชื่อม D1, กรอก Channel Secret ที่โฮสต์ และตั้ง Callback URL ใน LINE ก่อนเปิดรับผู้เล่นจริง ดู [วิธีติดตั้งแบบไม่มีค่าใช้จ่าย](SETUP-LINE.md)
+เลือกใช้ **Cloudflare Workers Free + D1 Free** ตามที่ผู้ดูแลต้องการ ไม่มีค่าเช่าเครื่องรายเดือนและใช้ URL `workers.dev` ที่ให้ฟรี ไฟล์ [wrangler.json](wrangler.json) ใช้ชื่อ `sectioncv` และ Database ID ของ `makro-player-data` ที่ผู้ดูแลสร้างและผูกกับ `DB` แล้ว ยังต้อง deploy สาขาเกมด้วย `npm run deploy` เพื่อสร้างตาราง, กรอก Channel Secret ที่โฮสต์ และตั้ง Callback URL ใน LINE ก่อนเปิดรับผู้เล่นจริง ดู [วิธีติดตั้งแบบไม่มีค่าใช้จ่าย](SETUP-LINE.md)
 
 แพ็กเกจ Free มีโควตา API 100,000 คำขอต่อวัน และฐานข้อมูลนี้สูงสุด 500 MB ไม่อัปเกรดเป็น Paid เพื่อรองรับการใช้งานเกินโควตา ดูขีดจำกัดการอ่าน/เขียนและแหล่งข้อมูลในคู่มือติดตั้ง
 
