@@ -6,7 +6,7 @@
 
 - โค้ดรองรับ LINE Login, ชื่อ/เบอร์ติดต่อ, อันดับรวม 10 คน, ป๊อปอัปเริ่มเกม และกดผิด +5 วินาที
 - ใช้ LINE Login Channel ID `2011516015` ตามที่ผู้ดูแลแจ้ง ยังไม่ได้ยืนยันการล็อกอินจริงกับ Channel นี้
-- ยังไม่ได้เชื่อมบัญชีหรือสร้างบริการ Cloudflare จริง ต้องติดตั้งและตั้งค่า Channel Secret บน Cloudflare ก่อน
+- ผู้ดูแลสร้าง Worker `sectioncv` และเชื่อม repository แล้ว ภาพหน้าจอวันที่ 9 กันยายน 2026 แสดงการ deploy จาก `main` เป็น static assets, `workers.dev` ปิด และยังไม่มี binding จึงยังไม่ได้เปิดระบบ LINE Login หรือฐานข้อมูลเกมจริง
 - [GitHub Pages เดิม](https://recruitmakrocareer.github.io/SectionCV/) ยังเป็น **โหมดฝึกซ้อมที่ไม่บันทึกอันดับ** ไม่มีข้อมูลผู้เล่นหรือบัญชี LINE จำลองในระบบจริง
 
 ## ขอบเขตแพ็กเกจฟรี
@@ -31,10 +31,10 @@
 
 ### ผ่านหน้า Cloudflare
 
-1. เชื่อมบัญชี Cloudflare ของผู้ดูแลและตรวจว่า Workers เป็น **Free** เปิด **Workers & Pages → Create application → Import a repository** เลือก `recruitmakrocareer/SectionCV` และ branch `codex/create-makro-sprite-spot-the-difference-game` (ไม่ใช่ `main` ซึ่งยังไม่มีชุดติดตั้งนี้)
-2. ตรวจชื่อ Worker `makro-photo-game`, D1 binding `DB` และเลือกสร้างฐานข้อมูลใหม่เฉพาะการติดตั้งครั้งแรก ตั้ง build command เป็น `npm run build` และ deploy command เป็น `npm run deploy` ใช้ Node.js 24 ขึ้นไปในสภาพแวดล้อม build ตัว deploy command จะสร้างตารางด้วย migration ก่อนเปิดเวอร์ชันใหม่
+1. ตรวจว่า Workers เป็น **Free** แล้วเปิด Worker `sectioncv` ที่สร้างไว้ → **Settings → Build** ใช้ repository `recruitmakrocareer/SectionCV` และเปลี่ยน Git/Production branch เป็น `codex/create-makro-sprite-spot-the-difference-game` ซึ่งมีโค้ดเกมและชุดติดตั้งนี้ หากยังไม่ได้เชื่อม Builds ให้กด Connect แล้วเลือก repository และ branch เดียวกัน
+2. ชื่อ Worker ใน `wrangler.json` คือ `sectioncv` ตรงกับโครงการที่ผู้ดูแลสร้าง ตั้ง build command เป็น `npm run build`, deploy command เป็น `npm run deploy` และ root directory เป็นราก repository ใช้ Node.js 24 ขึ้นไปในสภาพแวดล้อม build ตัว deploy command จะสร้างตารางด้วย migration ก่อนเปิดเวอร์ชันใหม่ ต้องตั้งค่าฐานข้อมูลในข้อ 3 ให้เสร็จก่อนเริ่ม build
 3. Cloudflare สามารถสร้าง D1 binding ที่ยังไม่มี ID ให้ระหว่างตั้งค่าโครงการได้ หากหน้าติดตั้งยังไม่ได้สร้างฐานข้อมูล ให้สร้าง D1 `makro-player-data` ในบัญชี Free ก่อน แล้วนำ **Database ID จริง** ใส่ `d1_databases[0].database_id` ใน `wrangler.json` และบันทึกลง branch นี้ ห้ามใช้ ID ตัวอย่าง เมื่อระบบสร้างให้เองจากหน้าเว็บ ให้คัดลอก ID กลับมาเก็บในไฟล์นี้หลังติดตั้งด้วย
-4. เมื่อ deploy สำเร็จ คัดลอก **URL HTTPS จริงที่ Cloudflare แสดง** แล้วไปที่ Worker → Settings → Variables and Secrets ตั้งค่าตามตารางด้านล่าง กดบันทึก/deploy ค่าตั้งแต่ละรายการ
+4. หลัง deploy จาก branch เกมสำเร็จ ตรวจว่ามี D1 binding `DB` และ `workers.dev` เปิดใช้งาน (`workers_dev: true` เตรียมไว้ในไฟล์แล้ว) คัดลอก **URL HTTPS จริงที่ Cloudflare แสดง** แล้วไปที่ Worker → Settings → Variables and Secrets ตั้งค่าตามตารางด้านล่าง กดบันทึก/deploy ค่าตั้งแต่ละรายการ การสร้าง Worker หรือมีข้อความ Deploy สำเร็จจาก `main` เพียงอย่างเดียวยังไม่ยืนยันว่า API เกมพร้อม
 5. ใน LINE Developers ของ Channel `2011516015` → แท็บ **LINE Login** → **Callback URL** ใส่ `<URL จริงของ Worker>/auth/line/callback` ไม่มี `/` ซ้อนกัน ไม่ใช้ URL ของ GitHub Pages
 6. ทดสอบด้วยบัญชี Admin/Tester ของ Channel ก่อน: ล็อกอิน → กรอกชื่อ/เบอร์และยินยอม → เล่นครบสามด่าน → ตรวจอันดับและหน้าผู้ดูแล จากนั้นตั้ง Channel เป็น **Published** เมื่อพร้อมให้บุคคลทั่วไปใช้ แล้วแชร์ URL ของ Worker
 
@@ -47,7 +47,7 @@
 
 ก่อนใส่ `APP_ORIGIN` และ Channel Secret ระบบแสดงโหมดฝึกซ้อม ไม่เปิด LINE Login อัตโนมัติจาก URL ที่ผู้เล่นส่งมา `keep_vars: true` ช่วยรักษาค่าที่ตั้งบน dashboard ระหว่าง deploy ส่วน Secret จะไม่อยู่ในไฟล์เว็บ
 
-อ้างอิงการตั้งค่า: [Wrangler configuration และการสร้างทรัพยากร](https://developers.cloudflare.com/workers/wrangler/configuration/), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)
+อ้างอิงการตั้งค่า: [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/), [workers.dev](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/), [Wrangler configuration และการสร้างทรัพยากร](https://developers.cloudflare.com/workers/wrangler/configuration/), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)
 
 ### ผ่านเครื่องผู้ติดตั้ง
 

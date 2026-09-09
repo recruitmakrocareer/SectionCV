@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "makro-photo-game",
+  "name": "sectioncv",
   "main": "worker/index.mjs",
   "compatibility_date": "2026-07-30",
   "workers_dev": true,
