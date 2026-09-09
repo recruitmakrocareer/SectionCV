@@ -6,3 +6,6 @@ data
 _site
 tests
 *.sqlite*
+.dev.vars
+.dev.vars.*
+.wrangler

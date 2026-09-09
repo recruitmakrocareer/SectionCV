@@ -156,11 +156,10 @@ test('top ten uses one best score per person; contact export requires an explici
 });
 
 test('production OAuth uses the configured deployment origin and ignores forwarded hosts', async (t) => {
-  const renderOrigin = 'https://deployment.example.test';
-  for (const appOrigin of [undefined, 'https://custom.example.test']) {
-    const dataDir = mkdtempSync(join(tmpdir(), 'makro-render-'));
+  for (const appOrigin of ['https://deployment.example.test', 'https://custom.example.test']) {
+    const dataDir = mkdtempSync(join(tmpdir(), 'makro-origin-'));
     const app = createApp({ dataDir, env: {
-      NODE_ENV: 'production', RENDER: 'true', RENDER_EXTERNAL_URL: renderOrigin,
+      NODE_ENV: 'production',
       APP_ORIGIN: appOrigin, LINE_CHANNEL_ID: '12345', LINE_CHANNEL_SECRET: 'test-only-secret'
     } });
     await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
@@ -170,7 +169,7 @@ test('production OAuth uses the configured deployment origin and ignores forward
       });
       assert.equal(response.status, 303);
       const redirect = new URL(response.headers.get('location'));
-      assert.equal(redirect.searchParams.get('redirect_uri'), `${appOrigin || renderOrigin}/auth/line/callback`);
+      assert.equal(redirect.searchParams.get('redirect_uri'), `${appOrigin}/auth/line/callback`);
       assert.equal(redirect.searchParams.has('client_secret'), false);
       const cookie = response.headers.getSetCookie()[0];
       assert.match(cookie, /; Secure(?:;|$)/);
@@ -181,9 +180,9 @@ test('production OAuth uses the configured deployment origin and ignores forward
     }
   }
   for (const badEnv of [
-    { RENDER: 'false', RENDER_EXTERNAL_URL: renderOrigin },
-    { RENDER: 'true', RENDER_EXTERNAL_URL: 'http://insecure.example.test' },
-    { RENDER: 'true', RENDER_EXTERNAL_URL: `${renderOrigin}/unexpected/path` }
+    {},
+    { APP_ORIGIN: 'http://insecure.example.test' },
+    { APP_ORIGIN: 'https://deployment.example.test/unexpected/path' }
   ]) {
     assert.throws(() => createApp({ env: { NODE_ENV: 'production', ...badEnv } }), /APP_ORIGIN/);
   }

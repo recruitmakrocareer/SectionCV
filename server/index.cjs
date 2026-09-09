@@ -6,21 +6,18 @@ const { mkdirSync, readFileSync, chmodSync, existsSync } = require('node:fs');
 const { resolve, extname } = require('node:path');
 const levels = require('../levels.js');
 
-const PENALTY_MS = 5000;
-const LEVEL_MS = 120000;
+const { advanceRun, PENALTY_MS, LEVEL_MS, fail } = require('./game-rules.cjs');
 const SESSION_MS = 7 * 86400000;
 const random = () => randomBytes(32).toString('base64url');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const equal = (a, b) => typeof a === 'string' && typeof b === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b));
-const fail = (message, status = 400) => { const error = new Error(message); error.status = status; throw error; };
 
 function createApp(options = {}) {
   const env = options.env || process.env;
   const now = options.now || Date.now;
   const lineFetch = options.lineFetch || fetch;
-  // Render supplies this trusted deployment URL. Never infer OAuth redirects
-  // from Host or forwarded headers received from a visitor.
-  const origin = env.APP_ORIGIN || (env.RENDER === 'true' && env.RENDER_EXTERNAL_URL) || 'http://localhost:8000';
+  // Never infer OAuth redirects from Host or forwarded visitor headers.
+  const origin = env.APP_ORIGIN || 'http://localhost:8000';
   const originURL = new URL(origin);
   if (originURL.origin !== origin || !['http:', 'https:'].includes(originURL.protocol)) throw new Error('APP_ORIGIN must be an origin without a path or trailing slash');
   if (env.NODE_ENV === 'production' && originURL.protocol !== 'https:') throw new Error('Production requires HTTPS APP_ORIGIN');
@@ -142,45 +139,7 @@ function createApp(options = {}) {
         if (previous.payload_hash !== digest) fail('รหัสรายการถูกใช้กับข้อมูลอื่นแล้ว', 409);
         db.exec('COMMIT'); return JSON.parse(previous.response);
       }
-      if (run.status !== 'active') fail('รอบนี้สิ้นสุดแล้ว กรุณาเริ่มเกมใหม่', 409);
-      if (event.seq !== run.last_seq + 1) fail('รายการเล่นมาไม่ครบ กรุณาลองส่งอีกครั้ง', 409);
-      if (now() - run.created_at > 3600000 || event.seq > 3000) fail('รอบเกมหมดอายุ กรุณาเริ่มใหม่', 409);
-      const timestamp = now();
-      const current = run.current_ms + (run.phase === 'playing' ? Math.max(0, timestamp - run.segment_at) : 0);
-      const found = new Set(JSON.parse(run.found));
-      let timedOut = run.phase === 'playing' && current >= LEVEL_MS;
-      if (timedOut || event.type === 'timeout') {
-        if (!timedOut && current < LEVEL_MS - 1500) fail('เวลาของรอบนี้ยังไม่หมด', 409);
-        run.status = 'failed'; run.phase = 'finished'; run.current_ms = LEVEL_MS;
-      } else if (event.type === 'begin') {
-        if (run.phase === 'intermission') {
-          if (event.level !== run.level + 1 || run.level >= levels.length - 1) fail('ต้องเล่นตามลำดับด่าน', 409);
-          run.level += 1; run.current_ms = 0; run.found = '[]'; run.hints = 0;
-        } else if (run.phase !== 'ready' || event.level !== run.level) fail('เริ่มด่านนี้ไม่ได้', 409);
-        run.phase = 'playing'; run.segment_at = timestamp;
-      } else if (event.type === 'resume') {
-        if (run.phase !== 'paused') fail('เกมไม่ได้หยุดพัก', 409);
-        run.phase = 'playing'; run.segment_at = timestamp;
-      } else if (event.type === 'pause') {
-        if (run.phase !== 'playing') fail('เกมยังไม่ได้เริ่ม', 409);
-        run.current_ms = current; run.phase = 'paused'; run.segment_at = null;
-      } else if (event.type === 'hit' || event.type === 'miss') {
-        if (run.phase !== 'playing') fail('เกมยังไม่ได้เริ่ม', 409);
-        if (event.type === 'miss') run.misses += 1;
-        else {
-          if (!levels[run.level].differences.some((d) => d.id === event.answer)) fail('คำตอบไม่ได้อยู่ในด่านนี้');
-          found.add(event.answer); run.found = JSON.stringify([...found]);
-          if (found.size === 5) {
-            run.elapsed_ms += current; run.current_ms = 0; run.segment_at = null;
-            run.phase = 'intermission';
-            if (run.level === levels.length - 1) {
-              run.status = 'complete'; run.phase = 'finished'; run.completed_at = timestamp;
-              run.score_ms = run.elapsed_ms + run.misses * PENALTY_MS;
-            }
-          }
-        }
-      } else fail('รายการเล่นไม่ถูกต้อง');
-      run.last_seq = event.seq;
+      advanceRun(run, event, now());
       db.prepare(`UPDATE runs SET status=?,level=?,phase=?,found=?,elapsed_ms=?,current_ms=?,misses=?,hints=?,segment_at=?,last_seq=?,completed_at=?,score_ms=? WHERE id=?`)
         .run(run.status, run.level, run.phase, run.found, run.elapsed_ms, run.current_ms, run.misses, run.hints, run.segment_at, run.last_seq, run.completed_at, run.score_ms, id);
       const response = { status: run.status, level: run.level, phase: run.phase, scoreMs: run.score_ms, misses: run.misses,

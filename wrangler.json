@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "makro-photo-game",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2026-07-30",
+  "workers_dev": true,
+  "preview_urls": false,
+  "keep_vars": true,
+  "send_metrics": false,
+  "observability": { "enabled": false },
+  "build": { "command": "node scripts/build-site.cjs" },
+  "assets": {
+    "directory": "./_site",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/auth/*"]
+  },
+  "vars": { "LINE_CHANNEL_ID": "2011516015" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "makro-player-data",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

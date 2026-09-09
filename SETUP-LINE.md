@@ -1,14 +1,84 @@
-# เปิดใช้ LINE Login และอันดับรวม
+# เปิดใช้ LINE Login และอันดับรวมแบบไม่มีค่าใช้จ่าย
 
-ตัวเกมและระบบบันทึกข้อมูลอยู่ในโครงการเดียวกัน ใช้ Node.js 24 ขึ้นไปและ SQLite บนดิสก์ถาวร ไม่ต้องซื้อแพ็กเกจฐานข้อมูลแยก แต่ต้องมีโฮสต์ที่รันเซิร์ฟเวอร์ได้และมี HTTPS
+ใช้ **Cloudflare Workers Free + D1 Free** สำหรับหน้าเกม เซิร์ฟเวอร์ LINE Login และฐานข้อมูลผู้เล่น ใช้ URL HTTPS `workers.dev` ที่ Cloudflare ออกให้ จึงไม่ต้องซื้อโดเมนหรือเช่าเครื่องรายเดือน ชุดติดตั้ง Render แบบเสียเงินถูกนำออกแล้ว
 
 ## สถานะ
 
-- หน้าเกมเดิมบน GitHub Pages เปิดป๊อปอัปเริ่มเกมและใช้กติกากดผิด +5 วินาทีได้ เป็น **โหมดฝึกซ้อมที่ไม่บันทึกอันดับ**
-- เซิร์ฟเวอร์ที่เพิ่มไว้รองรับ LINE Login, ชื่อและเบอร์ติดต่อ, อันดับร่วมกัน และหน้าผู้ดูแล
-- ต้องตั้งค่า LINE Login Channel และนำเซิร์ฟเวอร์ไปเปิดบนโฮสต์ก่อน จึงจะเข้าสู่ระบบ LINE และเก็บข้อมูลคนเล่นจริงได้
-- ไม่มีการฝังบัญชีทดสอบหรือข้อมูลผู้เล่นตัวอย่างลงในระบบจริง
-- ค่า `LINE_CHANNEL_ID` ใน `.env.example` และชุดติดตั้ง Render ระบุ `2011516015` ตามที่ผู้ดูแลแจ้ง ยังไม่ได้ยืนยันการล็อกอินกับ LINE จริง
+- โค้ดรองรับ LINE Login, ชื่อ/เบอร์ติดต่อ, อันดับรวม 10 คน, ป๊อปอัปเริ่มเกม และกดผิด +5 วินาที
+- ใช้ LINE Login Channel ID `2011516015` ตามที่ผู้ดูแลแจ้ง ยังไม่ได้ยืนยันการล็อกอินจริงกับ Channel นี้
+- ยังไม่ได้เชื่อมบัญชีหรือสร้างบริการ Cloudflare จริง ต้องติดตั้งและตั้งค่า Channel Secret บน Cloudflare ก่อน
+- [GitHub Pages เดิม](https://recruitmakrocareer.github.io/SectionCV/) ยังเป็น **โหมดฝึกซ้อมที่ไม่บันทึกอันดับ** ไม่มีข้อมูลผู้เล่นหรือบัญชี LINE จำลองในระบบจริง
+
+## ขอบเขตแพ็กเกจฟรี
+
+เลือกบัญชีที่เป็น **Workers Free** เท่านั้น ไม่อัปเกรด Workers Paid ไม่เปิดบริการเสริมที่คิดเงิน และใช้โดเมนฟรี `workers.dev` ตรวจแผนบัญชีก่อนสร้างบริการ เพราะบัญชีที่เป็น Paid อยู่แล้วใช้เงื่อนไขเรียกเก็บเงินของ Paid
+
+| ทรัพยากร | ขีดจำกัด Free ที่เกี่ยวกับเกม |
+| --- | --- |
+| Worker API/LINE Login | 100,000 คำขอต่อวัน, CPU 10 ms ต่อคำขอ |
+| ไฟล์หน้าเกมและภาพ | การเรียก static assets ฟรี ไม่จำกัดจำนวนคำขอ |
+| D1 อ่านข้อมูล | 5 ล้านแถวต่อวัน |
+| D1 เขียนข้อมูล | 100,000 แถวต่อวัน รวมงานอัปเดตดัชนี |
+| ขนาดฐานข้อมูลเกม | สูงสุด 500 MB ต่อฐานข้อมูล (รวมทั้งบัญชีสูงสุด 5 GB) |
+
+จำนวนคำขอไม่เท่ากับจำนวนผู้เล่น: หนึ่งเกมเรียก API หลายครั้ง เมื่อ D1 Free ใช้โควตารายวันหมด การบันทึก/อ่านจะขัดข้องจนโควตารีเซ็ต ไม่เปลี่ยนเป็นการคิดเงินส่วนเกินใน Free หากพื้นที่เต็มต้องจัดการข้อมูลก่อน ระบบเกมแสดงสถานะบันทึกไม่สำเร็จและให้ลองใหม่ ไม่รายงานว่าบันทึกแล้ว
+
+ราคาตรวจวันที่ 9 กันยายน 2026: [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/), [D1 limits](https://developers.cloudflare.com/d1/platform/limits/)
+
+## ติดตั้งบน Cloudflare Free
+
+ไฟล์ `wrangler.json` ระบุ Worker หนึ่งตัวและ D1 หนึ่งฐานข้อมูล ไม่มีบริการแบบเสียเงินเพิ่ม และยังไม่มี database ID จริง การติดตั้งใหม่ต้องบันทึก ID ที่ Cloudflare ออกให้ไว้กับโครงการเพื่อให้ deploy ครั้งต่อไปใช้ฐานข้อมูลเดิม
+
+### ผ่านหน้า Cloudflare
+
+1. เชื่อมบัญชี Cloudflare ของผู้ดูแลและตรวจว่า Workers เป็น **Free** เปิด **Workers & Pages → Create application → Import a repository** เลือก `recruitmakrocareer/SectionCV` และ branch `codex/create-makro-sprite-spot-the-difference-game` (ไม่ใช่ `main` ซึ่งยังไม่มีชุดติดตั้งนี้)
+2. ตรวจชื่อ Worker `makro-photo-game`, D1 binding `DB` และเลือกสร้างฐานข้อมูลใหม่เฉพาะการติดตั้งครั้งแรก ตั้ง build command เป็น `npm run build` และ deploy command เป็น `npm run deploy` ใช้ Node.js 24 ขึ้นไปในสภาพแวดล้อม build ตัว deploy command จะสร้างตารางด้วย migration ก่อนเปิดเวอร์ชันใหม่
+3. Cloudflare สามารถสร้าง D1 binding ที่ยังไม่มี ID ให้ระหว่างตั้งค่าโครงการได้ หากหน้าติดตั้งยังไม่ได้สร้างฐานข้อมูล ให้สร้าง D1 `makro-player-data` ในบัญชี Free ก่อน แล้วนำ **Database ID จริง** ใส่ `d1_databases[0].database_id` ใน `wrangler.json` และบันทึกลง branch นี้ ห้ามใช้ ID ตัวอย่าง เมื่อระบบสร้างให้เองจากหน้าเว็บ ให้คัดลอก ID กลับมาเก็บในไฟล์นี้หลังติดตั้งด้วย
+4. เมื่อ deploy สำเร็จ คัดลอก **URL HTTPS จริงที่ Cloudflare แสดง** แล้วไปที่ Worker → Settings → Variables and Secrets ตั้งค่าตามตารางด้านล่าง กดบันทึก/deploy ค่าตั้งแต่ละรายการ
+5. ใน LINE Developers ของ Channel `2011516015` → แท็บ **LINE Login** → **Callback URL** ใส่ `<URL จริงของ Worker>/auth/line/callback` ไม่มี `/` ซ้อนกัน ไม่ใช้ URL ของ GitHub Pages
+6. ทดสอบด้วยบัญชี Admin/Tester ของ Channel ก่อน: ล็อกอิน → กรอกชื่อ/เบอร์และยินยอม → เล่นครบสามด่าน → ตรวจอันดับและหน้าผู้ดูแล จากนั้นตั้ง Channel เป็น **Published** เมื่อพร้อมให้บุคคลทั่วไปใช้ แล้วแชร์ URL ของ Worker
+
+| ค่าบน Worker | ค่าและวิธีกรอก |
+| --- | --- |
+| `APP_ORIGIN` | URL HTTPS จริงของ Worker ไม่มี `/` ท้าย เช่นค่าที่คัดลอกจากหน้า deployment |
+| `LINE_CHANNEL_ID` | `2011516015` เตรียมไว้ในโค้ดแล้ว |
+| `LINE_CHANNEL_SECRET` | เลือกชนิด **Secret** แล้วกรอก Channel Secret จาก Basic settings ของ LINE Login Channel ลง Cloudflare โดยตรง ไม่ส่งในแชตหรือ GitHub |
+| `ADMIN_LINE_USER_IDS` | เลือกชนิด **Secret** แล้วกรอก **Your user ID** ของผู้ดูแลจาก Channel เดียวกัน หลายคนคั่นด้วย comma หากเว้นว่างจะไม่มีใครเปิดรายชื่อ/เบอร์ผู้เล่นได้ |
+
+ก่อนใส่ `APP_ORIGIN` และ Channel Secret ระบบแสดงโหมดฝึกซ้อม ไม่เปิด LINE Login อัตโนมัติจาก URL ที่ผู้เล่นส่งมา `keep_vars: true` ช่วยรักษาค่าที่ตั้งบน dashboard ระหว่าง deploy ส่วน Secret จะไม่อยู่ในไฟล์เว็บ
+
+อ้างอิงการตั้งค่า: [Wrangler configuration และการสร้างทรัพยากร](https://developers.cloudflare.com/workers/wrangler/configuration/), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)
+
+### ผ่านเครื่องผู้ติดตั้ง
+
+ใช้ Node.js 24 ขึ้นไป เริ่มจาก checkout branch ของ PR แล้วทำตามนี้หลังตรวจบัญชี Free:
+
+```bash
+npm ci --ignore-scripts
+npx wrangler login
+npx wrangler d1 create makro-player-data
+```
+
+ใส่ `database_id` จริงที่คำสั่งสร้างฐานข้อมูลคืนให้ใน binding `DB` ของ `wrangler.json` และ commit ค่านี้ (ID ไม่ใช่ Secret) จากนั้น:
+
+```bash
+npm run deploy
+```
+
+ตั้งค่าบน dashboard และตั้ง Callback URL ตามขั้นตอนด้านบน การ deploy ครั้งต่อไปใช้คำสั่งเดิมและฐานข้อมูลเดิม คำสั่ง migrations บันทึกว่าเคยสร้างตารางแล้ว ไม่ล้างผลการเล่น
+
+## ทดสอบในเครื่อง
+
+```bash
+npm ci --ignore-scripts
+npm test
+npm run check:worker
+npm run dev:worker
+```
+
+`npm test` ใช้ Node, DOM จำลอง และ Miniflare/workerd พร้อม D1 ในเครื่อง ครอบคลุมการเล่นจริงผ่านหน้าเกม, การตอบกลับ LINE จำลอง, การส่งซ้ำและคำขอพร้อมกัน, สิทธิ์ข้อมูลผู้เล่น และการเก็บข้อมูลหลังเริ่ม runtime ใหม่ ไม่เชื่อม LINE จริงหรือฐานข้อมูล production
+
+`npm run check:worker` สร้าง bundle และตรวจ config แบบ dry run ไม่สร้างบริการ Cloudflare ส่วน `npm run dev:worker` ใช้ฐานข้อมูลจำลองใน `.wrangler/` และเปิดโหมดฝึกซ้อมในเครื่อง หากต้องการตัวเลือก Node + SQLite เดิมสำหรับเครื่องที่ดูแลเอง ยังใช้ `npm start` กับ `.env.example` ได้ ข้อมูล D1 และ SQLite ในเครื่องเป็นคนละชุด ไม่มีการย้ายข้อมูลอัตโนมัติ
 
 ## สร้าง LINE Login Channel สำหรับเกม
 
@@ -35,37 +105,6 @@
 
 อ้างอิง: [การสร้างและตั้งค่า LINE Login Channel](https://developers.line.biz/en/docs/line-login/getting-started/)
 
-## ติดตั้งบน Render
-
-ชุดติดตั้ง `render.yaml` เตรียมเว็บเซิร์ฟเวอร์ Node.js 24 หนึ่งเครื่องที่สิงคโปร์ พร้อมดิสก์ถาวร 1 GB สำหรับข้อมูลผู้เล่น ใช้โค้ดจาก branch ของ PR นี้และปิดการ deploy อัตโนมัติ
-
-**มีค่าใช้จ่ายเมื่ออนุมัติสร้างบริการ:** ค่าเครื่อง `0.5c-512mb` เริ่มต้น US$7/เดือน และดิสก์ 1 GB US$0.25/เดือน รวมค่าเครื่องและดิสก์ US$7.25/เดือน ตามราคาที่ตรวจวันที่ 9 กันยายน 2026 ไม่รวมภาษี ค่าแพ็กเกจ workspace หากเลือกแบบเสียเงิน และการใช้งานเกินโควตา ตรวจยอดในหน้า Render ก่อนกดอนุมัติ
-
-[เปิดหน้าตรวจชุดติดตั้งบน Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Frecruitmakrocareer%2FSectionCV%2Ftree%2Fcodex%2Fcreate-makro-sprite-spot-the-difference-game)
-
-1. หลังยืนยันเลือกใช้โฮสต์นี้ เปิดลิงก์ด้านบน เข้าสู่บัญชี Render ของผู้ดูแล แล้วตรวจว่ารายการมีเว็บเซิร์ฟเวอร์หนึ่งเครื่องและดิสก์ 1 GB
-2. กรอก `LINE_CHANNEL_SECRET` ของ LINE Login Channel `2011516015` ในช่องของ Render โดยตรง ไม่ส่งผ่านแชตหรือ GitHub
-3. กรอก `ADMIN_LINE_USER_IDS` จาก **Your user ID** ใน Basic settings ของ LINE Login Channel เพื่อให้บัญชีนั้นดูชื่อและเบอร์ติดต่อในหน้าผู้ดูแลได้ ใส่หลายคนคั่นด้วย comma
-4. ตรวจค่าใช้จ่ายแล้วอนุมัติสร้างบริการ รอจนแสดงสถานะ Live จากนั้นคัดลอก URL HTTPS ที่ Render ออกให้ ห้ามเดา URL จากชื่อบริการ
-5. ไปที่ Channel `2011516015` ใน LINE Developers → แท็บ **LINE Login** → **Callback URL** กรอก URL จากข้อก่อนตามด้วย `/auth/line/callback`
-6. ทดสอบเข้าสู่ระบบ กรอกข้อมูล และเล่นครบสามด่านด้วยบัญชีผู้ดูแลก่อน เปลี่ยน Channel เป็น **Published** เมื่อพร้อมให้ผู้เล่นทั่วไปใช้ แล้วแชร์ URL ของ Render
-
-เซิร์ฟเวอร์ใช้ `RENDER_EXTERNAL_URL` ที่ Render ตั้งให้โดยอัตโนมัติ จึงไม่ต้องกรอก `APP_ORIGIN` ในการติดตั้งครั้งแรก หากเพิ่มโดเมนของตัวเองภายหลัง ให้กำหนด `APP_ORIGIN` เป็น origin ของโดเมนนั้นและแก้ Callback URL ให้ตรงกัน
-
-ฐานข้อมูลอยู่ที่ `/var/data/makro/makro.sqlite` บนดิสก์ถาวร เก็บบริการนี้ไว้หนึ่ง instance และสำรองฐานข้อมูลก่อนดำเนินการกับดิสก์ ช่วง deploy จะมีการหยุดบริการชั่วครู่ตามข้อจำกัดของโฮสต์ที่มีดิสก์ จึงควร deploy นอกช่วงจัดกิจกรรม
-
-อ้างอิง: [Render Blueprint](https://render.com/docs/blueprint-spec), [ตัวแปร URL ของ Render](https://render.com/docs/environment-variables), [ราคาเครื่อง](https://render.com/pricing), [ค่าดิสก์](https://render.com/articles/how-much-does-cloud-application-hosting-cost-for-small-businesses), [ข้อจำกัดดิสก์](https://render.com/docs/disks)
-
-## ขั้นตอนเปิดใช้งาน
-
-1. นำโครงการไปเปิดบนโฮสต์ที่รองรับ Node.js 24 พร้อมดิสก์ถาวร โดยรัน `npm start` หรือใช้ `Dockerfile` ที่เตรียมไว้ ต้องเก็บ `/app/data` บน persistent volume หากใช้ Docker ห้ามเก็บ SQLite บนพื้นที่ชั่วคราวของ serverless หรือบน filesystem ที่ไม่รองรับ SQLite locking
-2. ใช้ **โดเมนเดียวกัน** สำหรับหน้าเกมและ API ไม่ต้องเปิด CORS และไม่ส่งข้อมูลผู้เล่นไปยัง GitHub เลือก URL ที่มี HTTPS แล้วกำหนด `APP_ORIGIN` เป็น origin เช่น `https://game.example.com` (ตัวอย่างนี้ไม่ใช่ URL ที่ใช้งานจริง) โดยไม่มี `/` ท้าย URL
-3. ใน [LINE Developers Console](https://developers.line.biz/console/) สร้างหรือใช้ **LINE Login Channel** สำหรับ Web app ภายใต้ผู้ให้บริการขององค์กร ตั้ง callback URL เป็น `<APP_ORIGIN>/auth/line/callback` และเปิดสถานะ Published เมื่อพร้อมให้ผู้เล่นทั่วไปใช้
-4. ตั้งค่าฝั่งโฮสต์: `LINE_CHANNEL_ID`, `LINE_CHANNEL_SECRET`, `APP_ORIGIN`, `NODE_ENV=production`, `DATA_DIR` และ `ADMIN_LINE_USER_IDS` ตาม `.env.example` เก็บ Channel Secret ในช่อง secret/environment ของโฮสต์ ไม่ใส่ใน HTML, GitHub, screenshot หรือข้อความแชต
-5. `ADMIN_LINE_USER_IDS` คือ LINE user ID ที่ผ่านการยืนยันของผู้ดูแล (รูปแบบ `U` ตามด้วย 32 ตัวอักษร) ใส่หลายคนคั่นด้วย comma ถ้าเว้นว่างจะไม่มีใครเปิดข้อมูลติดต่อหรือส่งออก CSV ได้ อย่าตั้งคนแรกที่เข้าสู่ระบบเป็นผู้ดูแลโดยอัตโนมัติ
-6. ก่อนใช้จริง ให้ผู้ดูแลล็อกอินผ่าน LINE จริง กรอกชื่อและเบอร์ที่ยินยอมให้ทดสอบ เล่นครบสามด่าน และตรวจการแสดงอันดับกับสิทธิ์ของบัญชีที่ไม่ใช่ผู้ดูแล การทดสอบอัตโนมัติในโครงการจำลองเฉพาะการตอบกลับจาก LINE จึงไม่ทดแทนขั้นตอนนี้
-7. แชร์ URL ของโฮสต์ใหม่ให้ผู้เล่น หรือค่อยเปลี่ยนลิงก์จากเว็บ GitHub Pages หลังระบบ LINE พร้อมใช้งานแล้ว
-
 ## ข้อมูลและกติกา
 
 - LINE Login ขอเฉพาะ `openid profile` ไม่ขออีเมล เบอร์ติดต่อให้ผู้เล่นกรอกเอง เพราะ LINE Login ปกติไม่ได้ให้เบอร์โดยอัตโนมัติ
@@ -76,17 +115,7 @@
 - ไม่นับช่วงหยุดพักและโหลดด่าน การพักซ่อนภาพ คะแนนต้องผ่านครบสามด่านตามลำดับ หากหมดเวลา รอบนั้นไม่เข้าอันดับ และต้องเริ่มใหม่ทั้งสามด่าน
 - เก็บผลดีที่สุดคนละหนึ่งอันดับ เรียงเวลาน้อยที่สุดก่อน ถ้าเวลาเท่ากันใช้จำนวนกดผิดน้อยกว่า ตามด้วยเวลาที่บันทึกสำเร็จก่อน และรหัสรอบเพื่อให้ลำดับคงที่
 - รายการที่ส่งซ้ำเพราะเน็ตสะดุดใช้รหัสเดิม จึงไม่เพิ่มเวลาปรับหรือสถิติซ้ำ หากส่งไม่สำเร็จหน้าสรุปจะแจ้งให้ลองบันทึกใหม่ อย่าปิดหรือโหลดหน้าใหม่จนยืนยันว่าบันทึกแล้ว
-- ฐานข้อมูลส่วนตัวอยู่ใน `DATA_DIR` และถูกกันออกจาก Git กับไฟล์เผยแพร่ ผู้ดูแลโฮสต์ต้องดูแลสิทธิ์ดิสก์ สำรองข้อมูล และกำหนดระยะเวลาเก็บตามการใช้งานจริงขององค์กร
+- ข้อมูลจริงอยู่ใน D1 ที่ผูกกับ Worker ผ่าน binding `DB` ไม่อยู่ใน GitHub หรือไฟล์เว็บ ผู้ดูแลควรส่งออกสำรองข้อมูลและกำหนดระยะเวลาเก็บตามการใช้งานจริงขององค์กร การ redeploy ไม่ล้างฐานข้อมูล ห้ามลบหรือสร้าง D1 ใหม่ทับตัวเดิมระหว่างกิจกรรม
 
-## ทดสอบในเครื่อง
 
-```bash
-npm ci --ignore-scripts
-npm test
-npm run build
-npm start
-```
-
-หากไม่มี LINE Channel ให้เปิด `http://localhost:8000` เพื่อฝึกซ้อมได้ เซิร์ฟเวอร์จะไม่สร้างการยืนยัน LINE จำลองเพื่อให้ผ่านล็อกอิน
-
-เอกสารต้นทาง: [LINE Login สำหรับ Web app](https://developers.line.biz/en/docs/line-login/integrate-line-login/), [LINE Login API](https://developers.line.biz/en/reference/line-login/), [GitHub Pages เป็น static hosting](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)
+เอกสาร LINE: [LINE Login สำหรับ Web app](https://developers.line.biz/en/docs/line-login/integrate-line-login/), [LINE Login API](https://developers.line.biz/en/reference/line-login/)
