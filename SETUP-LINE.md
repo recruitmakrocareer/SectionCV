@@ -9,6 +9,31 @@
 - ต้องตั้งค่า LINE Login Channel และนำเซิร์ฟเวอร์ไปเปิดบนโฮสต์ก่อน จึงจะเข้าสู่ระบบ LINE และเก็บข้อมูลคนเล่นจริงได้
 - ไม่มีการฝังบัญชีทดสอบหรือข้อมูลผู้เล่นตัวอย่างลงในระบบจริง
 
+## สร้าง LINE Login Channel สำหรับเกม
+
+เปิด Provider ที่ดูแลเกมใน LINE Developers Console แล้วตรวจรายการ Channels ก่อน หากมี LINE Login Channel ของเกมนี้อยู่แล้ว ให้ใช้ช่องนั้น หากยังไม่มี ให้เลือก **Create a new channel → LINE Login** แล้วกรอกค่าดังนี้
+
+| ช่องที่ต้องกรอก | ค่าสำหรับเกม |
+| --- | --- |
+| Channel type | LINE Login |
+| Provider | Provider ขององค์กรที่ดูแลเกม หากต้องการเชื่อมกับ LINE OA เดิม ให้ใช้ Provider เดียวกับ Messaging API ของ OA นั้น |
+| Region to provide the service | Thailand |
+| Company or owner's country or region | Thailand |
+| Channel name | Makro Photo Game |
+| Channel description | เกมจับผิดภาพแม็คโคร 3 ด่าน สำหรับลงทะเบียนผู้เล่นและบันทึกอันดับตามเวลาที่ทำได้ |
+| App types | Web app |
+| Email address | อีเมลของผู้ดูแลที่ใช้รับแจ้งเตือนเกี่ยวกับ Channel |
+
+อ่านและยอมรับข้อตกลงที่หน้า LINE แสดงก่อนสร้าง Channel จากนั้นตรวจว่าแถบบนแสดง **LINE Login** และใน Basic settings แสดง **Web app**
+
+- Channel ประเภท **Messaging API** ใช้กับ LINE Official Account และไม่ใช่ Channel ที่ระบบล็อกอินของเกมนี้ต้องใช้ อย่านำ Channel ID หรือ Channel Secret ของ Messaging API มากรอกเป็นค่าล็อกอินเกม
+- การเพิ่ม LINE Login เป็นการสร้างอีก Channel ไม่ต้องเปลี่ยน Channel เดิมของแชตบอต
+- Channel ใหม่เริ่มที่สถานะ **Developing** ใช้ทดสอบด้วยบัญชีที่มีบทบาท Admin หรือ Tester ก่อน แล้วค่อยเปลี่ยนเป็น **Published** เมื่อพร้อมให้ผู้เล่นทั่วไปใช้
+- ส่งเฉพาะ Channel ID ให้ผู้ติดตั้งได้ เก็บ Channel Secret ไว้กรอกในช่อง secret ของโฮสต์ ห้ามส่งในแชต ภาพหน้าจอ หรือ commit
+- ยังไม่ต้องเดา Callback URL ให้ใช้ URL จริงของเซิร์ฟเวอร์ที่เปิดใช้งานแล้วตามขั้นตอนด้านล่าง เส้นทางบน GitHub Pages ไม่สามารถทำหน้าที่รับ callback ของเซิร์ฟเวอร์นี้ได้
+
+อ้างอิง: [การสร้างและตั้งค่า LINE Login Channel](https://developers.line.biz/en/docs/line-login/getting-started/)
+
 ## ขั้นตอนเปิดใช้งาน
 
 1. นำโครงการไปเปิดบนโฮสต์ที่รองรับ Node.js 24 พร้อมดิสก์ถาวร โดยรัน `npm start` หรือใช้ `Dockerfile` ที่เตรียมไว้ ต้องเก็บ `/app/data` บน persistent volume หากใช้ Docker ห้ามเก็บ SQLite บนพื้นที่ชั่วคราวของ serverless หรือบน filesystem ที่ไม่รองรับ SQLite locking
