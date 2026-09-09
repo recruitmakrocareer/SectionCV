@@ -1,0 +1,31 @@
+# Review Render's service and storage charges before approving this Blueprint.
+# LINE_CHANNEL_SECRET and administrator IDs are entered in Render, not GitHub.
+services:
+  - type: web
+    name: makro-photo-game
+    runtime: node
+    plan: 0.5c-512mb
+    region: singapore
+    repo: https://github.com/recruitmakrocareer/SectionCV
+    branch: codex/create-makro-sprite-spot-the-difference-game
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: npm start
+    healthCheckPath: /api/leaderboard
+    disk:
+      name: makro-player-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data/makro
+      - key: LINE_CHANNEL_ID
+        value: "2011516015"
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: ADMIN_LINE_USER_IDS
+        sync: false

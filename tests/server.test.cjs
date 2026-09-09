@@ -154,3 +154,37 @@ test('top ten uses one best score per person; contact export requires an explici
   assert.equal((await g.request('/data/makro.sqlite')).status, 404);
   assert.equal((await g.request('/server/index.cjs')).status, 404);
 });
+
+test('production OAuth uses the configured deployment origin and ignores forwarded hosts', async (t) => {
+  const renderOrigin = 'https://deployment.example.test';
+  for (const appOrigin of [undefined, 'https://custom.example.test']) {
+    const dataDir = mkdtempSync(join(tmpdir(), 'makro-render-'));
+    const app = createApp({ dataDir, env: {
+      NODE_ENV: 'production', RENDER: 'true', RENDER_EXTERNAL_URL: renderOrigin,
+      APP_ORIGIN: appOrigin, LINE_CHANNEL_ID: '12345', LINE_CHANNEL_SECRET: 'test-only-secret'
+    } });
+    await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+    try {
+      const response = await fetch(`http://127.0.0.1:${app.server.address().port}/auth/line/start`, {
+        redirect: 'manual', headers: { 'X-Forwarded-Host': 'attacker.example', 'X-Forwarded-Proto': 'http' }
+      });
+      assert.equal(response.status, 303);
+      const redirect = new URL(response.headers.get('location'));
+      assert.equal(redirect.searchParams.get('redirect_uri'), `${appOrigin || renderOrigin}/auth/line/callback`);
+      assert.equal(redirect.searchParams.has('client_secret'), false);
+      const cookie = response.headers.getSetCookie()[0];
+      assert.match(cookie, /; Secure(?:;|$)/);
+      assert.match(cookie, /; HttpOnly(?:;|$)/);
+      assert.match(cookie, /; SameSite=Lax(?:;|$)/);
+    } finally {
+      await app.close(); rmSync(dataDir, { recursive: true, force: true });
+    }
+  }
+  for (const badEnv of [
+    { RENDER: 'false', RENDER_EXTERNAL_URL: renderOrigin },
+    { RENDER: 'true', RENDER_EXTERNAL_URL: 'http://insecure.example.test' },
+    { RENDER: 'true', RENDER_EXTERNAL_URL: `${renderOrigin}/unexpected/path` }
+  ]) {
+    assert.throws(() => createApp({ env: { NODE_ENV: 'production', ...badEnv } }), /APP_ORIGIN/);
+  }
+});

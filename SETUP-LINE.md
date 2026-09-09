@@ -8,6 +8,7 @@
 - เซิร์ฟเวอร์ที่เพิ่มไว้รองรับ LINE Login, ชื่อและเบอร์ติดต่อ, อันดับร่วมกัน และหน้าผู้ดูแล
 - ต้องตั้งค่า LINE Login Channel และนำเซิร์ฟเวอร์ไปเปิดบนโฮสต์ก่อน จึงจะเข้าสู่ระบบ LINE และเก็บข้อมูลคนเล่นจริงได้
 - ไม่มีการฝังบัญชีทดสอบหรือข้อมูลผู้เล่นตัวอย่างลงในระบบจริง
+- ค่า `LINE_CHANNEL_ID` ใน `.env.example` และชุดติดตั้ง Render ระบุ `2011516015` ตามที่ผู้ดูแลแจ้ง ยังไม่ได้ยืนยันการล็อกอินกับ LINE จริง
 
 ## สร้าง LINE Login Channel สำหรับเกม
 
@@ -33,6 +34,27 @@
 - ยังไม่ต้องเดา Callback URL ให้ใช้ URL จริงของเซิร์ฟเวอร์ที่เปิดใช้งานแล้วตามขั้นตอนด้านล่าง เส้นทางบน GitHub Pages ไม่สามารถทำหน้าที่รับ callback ของเซิร์ฟเวอร์นี้ได้
 
 อ้างอิง: [การสร้างและตั้งค่า LINE Login Channel](https://developers.line.biz/en/docs/line-login/getting-started/)
+
+## ติดตั้งบน Render
+
+ชุดติดตั้ง `render.yaml` เตรียมเว็บเซิร์ฟเวอร์ Node.js 24 หนึ่งเครื่องที่สิงคโปร์ พร้อมดิสก์ถาวร 1 GB สำหรับข้อมูลผู้เล่น ใช้โค้ดจาก branch ของ PR นี้และปิดการ deploy อัตโนมัติ
+
+**มีค่าใช้จ่ายเมื่ออนุมัติสร้างบริการ:** ค่าเครื่อง `0.5c-512mb` เริ่มต้น US$7/เดือน และดิสก์ 1 GB US$0.25/เดือน รวมค่าเครื่องและดิสก์ US$7.25/เดือน ตามราคาที่ตรวจวันที่ 9 กันยายน 2026 ไม่รวมภาษี ค่าแพ็กเกจ workspace หากเลือกแบบเสียเงิน และการใช้งานเกินโควตา ตรวจยอดในหน้า Render ก่อนกดอนุมัติ
+
+[เปิดหน้าตรวจชุดติดตั้งบน Render](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2Frecruitmakrocareer%2FSectionCV%2Ftree%2Fcodex%2Fcreate-makro-sprite-spot-the-difference-game)
+
+1. หลังยืนยันเลือกใช้โฮสต์นี้ เปิดลิงก์ด้านบน เข้าสู่บัญชี Render ของผู้ดูแล แล้วตรวจว่ารายการมีเว็บเซิร์ฟเวอร์หนึ่งเครื่องและดิสก์ 1 GB
+2. กรอก `LINE_CHANNEL_SECRET` ของ LINE Login Channel `2011516015` ในช่องของ Render โดยตรง ไม่ส่งผ่านแชตหรือ GitHub
+3. กรอก `ADMIN_LINE_USER_IDS` จาก **Your user ID** ใน Basic settings ของ LINE Login Channel เพื่อให้บัญชีนั้นดูชื่อและเบอร์ติดต่อในหน้าผู้ดูแลได้ ใส่หลายคนคั่นด้วย comma
+4. ตรวจค่าใช้จ่ายแล้วอนุมัติสร้างบริการ รอจนแสดงสถานะ Live จากนั้นคัดลอก URL HTTPS ที่ Render ออกให้ ห้ามเดา URL จากชื่อบริการ
+5. ไปที่ Channel `2011516015` ใน LINE Developers → แท็บ **LINE Login** → **Callback URL** กรอก URL จากข้อก่อนตามด้วย `/auth/line/callback`
+6. ทดสอบเข้าสู่ระบบ กรอกข้อมูล และเล่นครบสามด่านด้วยบัญชีผู้ดูแลก่อน เปลี่ยน Channel เป็น **Published** เมื่อพร้อมให้ผู้เล่นทั่วไปใช้ แล้วแชร์ URL ของ Render
+
+เซิร์ฟเวอร์ใช้ `RENDER_EXTERNAL_URL` ที่ Render ตั้งให้โดยอัตโนมัติ จึงไม่ต้องกรอก `APP_ORIGIN` ในการติดตั้งครั้งแรก หากเพิ่มโดเมนของตัวเองภายหลัง ให้กำหนด `APP_ORIGIN` เป็น origin ของโดเมนนั้นและแก้ Callback URL ให้ตรงกัน
+
+ฐานข้อมูลอยู่ที่ `/var/data/makro/makro.sqlite` บนดิสก์ถาวร เก็บบริการนี้ไว้หนึ่ง instance และสำรองฐานข้อมูลก่อนดำเนินการกับดิสก์ ช่วง deploy จะมีการหยุดบริการชั่วครู่ตามข้อจำกัดของโฮสต์ที่มีดิสก์ จึงควร deploy นอกช่วงจัดกิจกรรม
+
+อ้างอิง: [Render Blueprint](https://render.com/docs/blueprint-spec), [ตัวแปร URL ของ Render](https://render.com/docs/environment-variables), [ราคาเครื่อง](https://render.com/pricing), [ค่าดิสก์](https://render.com/articles/how-much-does-cloud-application-hosting-cost-for-small-businesses), [ข้อจำกัดดิสก์](https://render.com/docs/disks)
 
 ## ขั้นตอนเปิดใช้งาน
 

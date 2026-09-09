@@ -18,7 +18,9 @@ function createApp(options = {}) {
   const env = options.env || process.env;
   const now = options.now || Date.now;
   const lineFetch = options.lineFetch || fetch;
-  const origin = env.APP_ORIGIN || 'http://localhost:8000';
+  // Render supplies this trusted deployment URL. Never infer OAuth redirects
+  // from Host or forwarded headers received from a visitor.
+  const origin = env.APP_ORIGIN || (env.RENDER === 'true' && env.RENDER_EXTERNAL_URL) || 'http://localhost:8000';
   const originURL = new URL(origin);
   if (originURL.origin !== origin || !['http:', 'https:'].includes(originURL.protocol)) throw new Error('APP_ORIGIN must be an origin without a path or trailing slash');
   if (env.NODE_ENV === 'production' && originURL.protocol !== 'https:') throw new Error('Production requires HTTPS APP_ORIGIN');
