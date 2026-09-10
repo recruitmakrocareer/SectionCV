@@ -2,68 +2,114 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="ระบบจัดการใบสมัครและรีวิวเรซูเม่สำหรับทีมสรรหาบุคลากร">
-  <title>SectionCV — Resume Workspace</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="เกมจับผิดภาพเสมือนจริง 3 ด่านในแม็คโคร ด่านละ 5 จุด เล่นบนมือถือได้">
+  <title>MAKRO — จับผิดภาพเสมือนจริง 3 ด่าน</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260908-players1">
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <a class="brand" href="#" aria-label="SectionCV หน้าหลัก"><span class="brand-mark">S</span><span>Section<span>CV</span></span></a>
-      <nav aria-label="เมนูหลัก">
-        <a class="nav-item active" href="#"><span>▦</span> ผู้สมัครทั้งหมด <b id="navCount">6</b></a>
-        <a class="nav-item" href="#"><span>☆</span> รายการโปรด</a>
-        <a class="nav-item" href="#"><span>◷</span> รอพิจารณา</a>
-        <a class="nav-item" href="#"><span>✓</span> ผ่านการคัดเลือก</a>
-      </nav>
-      <div class="sidebar-bottom">
-        <button class="nav-item button-reset" id="importOpen"><span>⇧</span> นำเข้าข้อมูล</button>
-        <a class="nav-item" href="#"><span>⚙</span> ตั้งค่า</a>
-        <div class="user-card"><div class="avatar small">NP</div><div><strong>นันทิยา พรหมดี</strong><small>Talent Acquisition</small></div><button aria-label="เมนูผู้ใช้">⋯</button></div>
+  <header class="site-header">
+    <a class="logo" href="#" aria-label="Makro home">makro<span>.</span></a>
+    <nav aria-label="เมนูหลัก">
+      <a class="active" href="#game">หน้าแรก</a>
+      <a href="#howto">วิธีเล่น</a>
+      <a href="#leaderboard">10 อันดับแรก</a>
+    </nav>
+    <button class="sound-button" id="soundToggle" aria-label="เปิดหรือปิดเสียง" aria-pressed="false">
+      <span id="soundIcon">♪</span><span class="sound-label">เสียง</span>
+    </button>
+  </header>
+
+  <main id="game">
+    <section class="hero">
+      <div class="sparkle sparkle-one">✦</div><div class="sparkle sparkle-two">✦</div>
+      <p class="kicker">3 ด่าน · 15 จุดต่าง</p>
+      <h1>เกม<span>จับผิดภาพ</span></h1>
+      <p class="hero-copy">3 ด่าน · ด่านละ 5 จุด ใน 2 นาที · กดผิดบวกเวลาจัดอันดับครั้งละ 5 วินาที</p>
+      <div class="game-stats">
+        <div class="stat"><span class="stat-icon clock-icon">◷</span><div><small>เวลาที่เหลือ</small><strong id="timer" role="timer" aria-label="เวลาที่เหลือ">02:00</strong></div></div>
+        <div class="divider"></div>
+        <div class="stat"><span class="stat-icon target-icon">◎</span><div><small>พบในด่านนี้</small><strong><span id="foundCount">0</span><em>/5 จุด</em></strong></div></div>
       </div>
-    </aside>
+      <div class="score-strip"><span>เวลาจัดอันดับ <b id="scoreTime">00:00.00</b></span><span id="penaltySummary">กดผิด 0 ครั้ง · +0 วินาที</span><span id="playerBadge">ฝึกซ้อม · ไม่บันทึกอันดับ</span></div>
+    </section>
 
-    <main>
-      <header class="topbar">
-        <div><p class="eyebrow">RESUME WORKSPACE</p><h1>ผู้สมัครทั้งหมด</h1><p class="subtitle">จัดการ ตรวจสอบ และทำงานร่วมกับทีมได้ในที่เดียว</p></div>
-        <div class="header-actions"><button class="icon-btn" aria-label="การแจ้งเตือน">♢<i></i></button><button class="primary-btn" id="importTop">＋ นำเข้าผู้สมัคร</button></div>
-      </header>
+    <section class="game-card" aria-label="เกมจับผิดภาพ">
+      <div class="play-controls">
+        <p id="gameStatus" role="status">กำลังเตรียมภาพด่านที่ 1…</p>
+        <div class="control-buttons"><button id="startButton" type="button" class="primary-button" hidden disabled>กำลังโหลดภาพ…</button><button id="restartButton" type="button" class="secondary-button" disabled>เริ่มด่านนี้ใหม่</button><button id="accountButton" type="button" class="secondary-button">ข้อมูลผู้เล่น</button></div>
+      </div>
+      <noscript><p class="no-script">กรุณาเปิด JavaScript ในเบราว์เซอร์เพื่อเล่นเกมนี้</p></noscript>
+      <ol class="level-tracker" id="levelTracker" aria-label="ความคืบหน้า 3 ด่าน"></ol>
+      <div class="card-top">
+        <div><span class="level-pill" id="levelLabel">ด่านที่ 1 / 3</span><h2 id="levelTitle">โซนผักและผลไม้</h2></div>
+        <div class="progress-wrap"><div class="progress-info"><span>ความคืบหน้า</span><b id="progressText">0%</b></div><div class="progress" id="gameProgress" role="progressbar" aria-label="จุดต่างที่พบ" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><i id="progressBar"></i></div></div>
+      </div>
 
-      <section class="stats" aria-label="สถิติผู้สมัคร">
-        <article><div class="stat-icon blue">♙</div><div><span>ผู้สมัครทั้งหมด</span><strong id="totalCount">6</strong><small class="positive">↗ 12% จากสัปดาห์ก่อน</small></div></article>
-        <article><div class="stat-icon amber">◷</div><div><span>รอพิจารณา</span><strong id="pendingCount">3</strong><small>อัปเดตล่าสุดวันนี้</small></div></article>
-        <article><div class="stat-icon green">✓</div><div><span>ผ่านการคัดเลือก</span><strong>2</strong><small class="positive">อัตราผ่าน 33%</small></div></article>
-        <article><div class="stat-icon purple">▤</div><div><span>ความคิดเห็น</span><strong id="commentCount">8</strong><small>จากทีมสรรหา</small></div></article>
-      </section>
+      <div class="pictures" data-state="loading" aria-busy="true">
+        <article class="picture-panel">
+          <span class="picture-label">ภาพต้นฉบับ</span>
+          <div class="scene-wrap playable" data-scene="original" aria-label="ภาพต้นฉบับ แตะเพื่อเลือกจุดแตกต่าง">
+            <img class="scene" id="originalImage" width="1536" height="1024" alt="ภาพเสมือนจริงของโซนผักและผลไม้" draggable="false">
+          </div>
+        </article>
+        <article class="picture-panel">
+          <span class="picture-label different">ภาพที่แตกต่าง · 5 จุด</span>
+          <div class="scene-wrap playable" id="playScene" data-scene="different" aria-label="ภาพที่แตกต่าง แตะเพื่อเลือกจุดแตกต่าง">
+            <img class="scene" id="comparisonImage" width="1536" height="1024" alt="ภาพเปรียบเทียบที่มีจุดแตกต่าง 5 จุด" draggable="false">
+            <img class="difference-layer" id="differenceImage" width="1536" height="1024" alt="" aria-hidden="true" draggable="false">
+          </div>
+        </article>
+      </div>
+      <div class="game-actions"><p><span>💡</span> แตะจุดต่างได้ทั้งสองภาพ<span class="zoom-tip">ใช้สองนิ้วซูมเพื่อดูรายละเอียด</span></p><button id="hintButton" type="button" disabled><span>◎</span> ใช้คำใบ้ <b id="hintCount">2</b></button></div>
+    </section>
 
-      <section class="workspace">
-        <div class="toolbar">
-          <label class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="ค้นหาชื่อ อีเมล หรือตำแหน่ง..." aria-label="ค้นหาผู้สมัคร"></label>
-          <div class="filters"><select id="branchFilter" aria-label="กรองสาขา"><option value="">ทุกสาขา</option></select><select id="statusFilter" aria-label="กรองสถานะ"><option value="">ทุกสถานะ</option><option>รอพิจารณา</option><option>ผ่านการคัดเลือก</option><option>นัดสัมภาษณ์</option></select><button class="view-btn active" id="gridView" aria-label="มุมมองการ์ด">▦</button><button class="view-btn" id="listView" aria-label="มุมมองรายการ">☷</button></div>
-        </div>
-        <div class="result-meta"><span>แสดง <b id="resultCount">6</b> ผู้สมัคร</span><button class="sort-btn">เรียงตาม: <b>ล่าสุด</b>⌄</button></div>
-        <div class="candidate-grid" id="candidateGrid"></div>
-        <div class="empty-state" id="emptyState" hidden><span>⌕</span><h3>ไม่พบผู้สมัคร</h3><p>ลองเปลี่ยนคำค้นหาหรือตัวกรองของคุณ</p></div>
-      </section>
-    </main>
+    <section class="leaderboard-card" id="leaderboard" aria-labelledby="leaderboardTitle">
+      <div class="leaderboard-heading"><div><p class="section-kicker">TOP 10</p><h2 id="leaderboardTitle">10 อันดับเวลาที่ดีที่สุด</h2></div><button id="refreshLeaderboard" class="secondary-button" type="button">อัปเดตอันดับ</button></div>
+      <p>เวลารวมทั้ง 3 ด่าน + กดผิดครั้งละ 5 วินาที · เก็บสถิติที่ดีที่สุดคนละ 1 อันดับ</p>
+      <p id="leaderboardStatus" role="status">กำลังโหลดอันดับ…</p>
+      <div class="table-scroll"><table id="leaderboardTable" hidden><thead><tr><th scope="col">อันดับ</th><th scope="col">ผู้เล่น</th><th scope="col">เวลารวม</th><th scope="col">กดผิด</th></tr></thead><tbody id="leaderboardRows"></tbody></table></div>
+      <p class="privacy-caption">แสดงเฉพาะชื่อและสถิติการเล่น เบอร์ติดต่อดูได้เฉพาะผู้ดูแลกิจกรรม</p>
+    </section>
+    <section class="how-to" id="howto">
+      <p class="section-kicker">HOW TO PLAY</p><h2>วิธีเล่นง่าย ๆ</h2>
+      <div class="steps"><article><b>1</b><span>👀</span><h3>สังเกตภาพ</h3><p>เปรียบเทียบภาพทั้งสองด้าน<br>อย่างละเอียด</p></article><i></i><article><b>2</b><span>☝️</span><h3>แตะจุดต่าง</h3><p>เจอแล้วแตะที่ตำแหน่ง<br>ในภาพใดก็ได้</p></article><i></i><article><b>3</b><span>🎉</span><h3>ค้นหาให้ครบ</h3><p>หาครบ 5 จุดแล้วไปด่านถัดไป<br>ผ่านให้ครบทั้ง 3 ด่าน</p></article></div>
+    </section>
+  </main>
+
+  <footer><a class="logo footer-logo" href="#">makro<span>.</span></a><p>สนุกทุกช้อป คุ้มทุกวัน ที่แม็คโคร</p><small>Makro · เกมจับผิดภาพเสมือนจริง</small></footer>
+
+  <div class="modal start-modal" id="startModal">
+    <div class="modal-card start-card" role="dialog" aria-modal="true" aria-labelledby="startTitle" aria-describedby="startRules">
+      <p class="section-kicker">MAKRO PHOTO CHALLENGE</p><h2 id="startTitle">พร้อมจับผิดภาพแล้วหรือยัง?</h2>
+      <p id="startRules">หาจุดต่างให้ครบ 15 จุดใน 3 ด่าน<br>กดผิด 1 ครั้ง <strong>+5 วินาที</strong> ในเวลาจัดอันดับ</p>
+      <div class="start-facts"><span>ด่านละ <b>2 นาที</b></span><span>คำใบ้ <b>2 ครั้ง/ด่าน</b></span><span>ยิ่งเร็ว <b>อันดับยิ่งดี</b></span></div>
+      <div id="loginPanel"><p id="loginStatus" role="status">กำลังตรวจการเข้าสู่ระบบ…</p><a id="lineLogin" class="line-button" href="auth/line/start" hidden>เข้าสู่ระบบด้วย LINE</a></div>
+      <form id="playerForm" hidden>
+        <p id="lineIdentity"></p>
+        <label for="playerName">ชื่อที่ใช้ในกิจกรรมและตารางอันดับ</label><input id="playerName" name="name" autocomplete="name" minlength="2" maxlength="80" required>
+        <label for="playerPhone">เบอร์ติดต่อ</label><input id="playerPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="08x xxx xxxx" maxlength="20" required>
+        <p class="privacy-caption">ใช้ข้อมูลเพื่อระบุตัวผู้เล่น บันทึกสถิติ และติดต่อเกี่ยวกับกิจกรรมนี้ เบอร์โทรไม่แสดงต่อผู้เล่นอื่น</p>
+        <label class="consent-row"><input id="playerConsent" type="checkbox" required><span>ยินยอมให้จัดเก็บชื่อ เบอร์ติดต่อ และสถิติตามวัตถุประสงค์ข้างต้น</span></label>
+        <button id="savePlayer" type="submit" class="secondary-button">บันทึกข้อมูลผู้เล่น</button>
+      </form>
+      <p id="profileStatus" role="status"></p>
+      <button id="popupStartButton" type="button" class="start-cta" disabled>กำลังโหลดภาพ…</button>
+      <p id="startModeNote" class="privacy-caption">รอภาพพร้อมก่อนเริ่มจับเวลา</p>
+      <div class="account-actions"><button id="logoutButton" class="secondary-button" type="button" hidden>ออกจากระบบ</button><a id="adminLink" href="admin.html" hidden>ดูข้อมูลผู้เล่น</a></div>
+    </div>
   </div>
-
-  <div class="drawer-overlay" id="drawerOverlay" hidden></div>
-  <aside class="resume-drawer" id="resumeDrawer" aria-hidden="true"><button class="drawer-close" id="drawerClose" aria-label="ปิด">×</button><div id="resumeContent"></div></aside>
-
-  <dialog id="importDialog">
-    <form method="dialog" class="modal-card">
-      <div class="modal-head"><div><p class="eyebrow">IMPORT DATA</p><h2>นำเข้าข้อมูลผู้สมัคร</h2></div><button class="modal-close" value="cancel" aria-label="ปิด">×</button></div>
-      <p class="modal-help">วางข้อมูลจาก Google Sheets หรือไฟล์ TSV โดยเรียงคอลัมน์: ประทับเวลา, ชื่อ, วันเกิด, อีเมล, โทรศัพท์, LINE ID, ที่อยู่, Resume และตำแหน่ง</p>
-      <textarea id="importData" placeholder="วางข้อมูลตารางที่นี่..."></textarea>
-      <div class="modal-actions"><button class="secondary-btn" value="cancel">ยกเลิก</button><button class="primary-btn" type="button" id="importConfirm">นำเข้าข้อมูล</button></div>
-    </form>
-  </dialog>
-  <div class="toast" id="toast" role="status">นำเข้าข้อมูลเรียบร้อยแล้ว</div>
-  <script src="app.js"></script>
+  <div class="modal" id="resultModal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultMessage">
+      <div class="trophy" id="resultIcon" aria-hidden="true">🏆</div><p class="section-kicker" id="resultLabel">พบครบแล้ว!</p><h2 id="resultTitle">เก่งมาก! คุณเจอครบแล้ว</h2><p id="resultMessage">คุณตามหาจุดแตกต่างครบทั้ง 5 จุดได้สำเร็จ</p><p id="saveScoreStatus" role="status"></p><button id="retryScore" type="button" class="secondary-button" hidden>ลองบันทึกสถิติอีกครั้ง</button><div class="result-actions"><button id="playAgain" type="button">เล่นอีกครั้ง</button><button id="closeResult" type="button" class="secondary-button">กลับไปดูภาพ</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="levels.js?v=20260908-photos1"></script>
+  <script src="account.js?v=20260908-players1"></script>
+  <script src="app.js?v=20260908-players1"></script>
 </body>
 </html>

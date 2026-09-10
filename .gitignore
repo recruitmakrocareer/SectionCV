@@ -1,0 +1,12 @@
+node_modules/
+_site/
+data/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example

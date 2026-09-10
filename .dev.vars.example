@@ -1,0 +1,7 @@
+# Optional local variables. Copy to .dev.vars, which is ignored by Git.
+# Leave the secret blank for practice. Use Cloudflare's encrypted secret field
+# for the production LINE_CHANNEL_SECRET, never this example or a chat message.
+LINE_CHANNEL_ID=2011516015
+LINE_CHANNEL_SECRET=
+APP_ORIGIN=
+ADMIN_LINE_USER_IDS=

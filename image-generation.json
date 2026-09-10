@@ -1,0 +1,503 @@
+{
+  "version": 1,
+  "method": "Built-in image_gen only. Three base generations, three initial edit generations, one targeted produce repair. Six final photo files.",
+  "coordinate_system": "Percent of full 1536x1024 image. x and y are centers. width and height are FULL extents, not radii. object contains the tighter changed-object bounds; top-level extents match suggested mask. featherStart 0.8 means fully opaque through 80 percent of elliptical radius, then fade to zero.",
+  "mask_notes": "Default suggested mask dimensions are 1.8 times the tight rectangular object bounds; the opaque core contains the tight-box corners. Bakery sugar mask is custom-tightened as requested by the integrator. Derive minimum 44px touch targets independently.",
+  "levels": [
+    {
+      "level": 1,
+      "scene": "produce",
+      "width": 1536,
+      "height": 1024,
+      "base": "assets/produce-original.webp",
+      "edited": "assets/produce-edited.webp",
+      "differences": [
+        {
+          "id": "produce-banana",
+          "label_th": "รอยสีน้ำตาลบนกล้วย",
+          "description": "Two upright bananas near the upper-left of the bunch gain broad dark-brown ripening patches. The generator placed these higher than the initial requested coordinates.",
+          "x": 12.598,
+          "y": 13.135,
+          "width": 9.961,
+          "height": 19.161,
+          "object": {
+            "x": 12.598,
+            "y": 13.135,
+            "width": 5.534,
+            "height": 10.645
+          },
+          "mask": {
+            "x": 12.598,
+            "y": 13.135,
+            "width": 9.961,
+            "height": 19.161,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            151,
+            80,
+            236,
+            189
+          ]
+        },
+        {
+          "id": "produce-cabbage",
+          "label_th": "กะหล่ำปลีเปลี่ยนสี",
+          "description": "The frontmost upper round cabbage becomes purple.",
+          "x": 39.941,
+          "y": 20.703,
+          "width": 15.586,
+          "height": 16.171,
+          "object": {
+            "x": 39.941,
+            "y": 20.703,
+            "width": 8.659,
+            "height": 8.984
+          },
+          "mask": {
+            "x": 39.941,
+            "y": 20.703,
+            "width": 15.586,
+            "height": 16.171,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            547,
+            166,
+            680,
+            258
+          ]
+        },
+        {
+          "id": "produce-pepper",
+          "label_th": "พริกหวานเปลี่ยนสี",
+          "description": "One front yellow bell pepper becomes red, retaining its green stem.",
+          "x": 57.096,
+          "y": 38.086,
+          "width": 7.735,
+          "height": 10.899,
+          "object": {
+            "x": 57.096,
+            "y": 38.086,
+            "width": 4.297,
+            "height": 6.055
+          },
+          "mask": {
+            "x": 57.096,
+            "y": 38.086,
+            "width": 7.735,
+            "height": 10.899,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            844,
+            359,
+            910,
+            421
+          ]
+        },
+        {
+          "id": "produce-tomato",
+          "label_th": "มะเขือเทศเปลี่ยนสี",
+          "description": "The topmost tomato in the lower-left bin becomes yellow-gold.",
+          "x": 24.023,
+          "y": 70.361,
+          "width": 8.906,
+          "height": 13.183,
+          "object": {
+            "x": 24.023,
+            "y": 70.361,
+            "width": 4.948,
+            "height": 7.324
+          },
+          "mask": {
+            "x": 24.023,
+            "y": 70.361,
+            "width": 8.906,
+            "height": 13.183,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            331,
+            683,
+            407,
+            758
+          ]
+        },
+        {
+          "id": "produce-citrus",
+          "label_th": "ส้มเปลี่ยนเป็นสีเขียว",
+          "description": "One foreground orange in the right-center bin has green citrus peel.",
+          "x": 69.596,
+          "y": 77.393,
+          "width": 10.546,
+          "height": 15.293,
+          "object": {
+            "x": 69.596,
+            "y": 77.393,
+            "width": 5.859,
+            "height": 8.496
+          },
+          "mask": {
+            "x": 69.596,
+            "y": 77.393,
+            "width": 10.546,
+            "height": 15.293,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            1024,
+            749,
+            1114,
+            836
+          ]
+        }
+      ],
+      "registration_notes": "Same framing and object placement are visually maintained, but fine textures and highlights drift throughout the edited source after two built-in edit passes. Layer only the five masks over the original. Initial orange-removal edit was unclear; a targeted repair changed the same orange to green. Use only the final edited path."
+    },
+    {
+      "level": 2,
+      "scene": "bakery",
+      "width": 1536,
+      "height": 1024,
+      "base": "assets/bakery-original.webp",
+      "edited": "assets/bakery-edited.webp",
+      "differences": [
+        {
+          "id": "bakery-score",
+          "label_th": "รอยบากบนขนมปัง",
+          "description": "An additional broad diagonal pale score crosses the first small round loaf right of the baguette basket.",
+          "x": 30.404,
+          "y": 20.898,
+          "width": 11.25,
+          "height": 15.82,
+          "object": {
+            "x": 30.404,
+            "y": 20.898,
+            "width": 6.25,
+            "height": 8.789
+          },
+          "mask": {
+            "x": 30.404,
+            "y": 20.898,
+            "width": 11.25,
+            "height": 15.82,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            419,
+            169,
+            515,
+            259
+          ]
+        },
+        {
+          "id": "bakery-sesame",
+          "label_th": "งาบนขนมปังก้อน",
+          "description": "The front upper-right roll gains pale sesame seeds.",
+          "x": 89.583,
+          "y": 24.951,
+          "width": 12.89,
+          "height": 13.183,
+          "object": {
+            "x": 89.583,
+            "y": 24.951,
+            "width": 7.161,
+            "height": 7.324
+          },
+          "mask": {
+            "x": 89.583,
+            "y": 24.951,
+            "width": 12.89,
+            "height": 13.183,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            1321,
+            218,
+            1431,
+            293
+          ]
+        },
+        {
+          "id": "bakery-chocolate",
+          "label_th": "ปลายครัวซองต์เคลือบช็อกโกแลต",
+          "description": "The right tip of the front-left croissant is dipped in dark chocolate.",
+          "x": 12.5,
+          "y": 54.98,
+          "width": 7.031,
+          "height": 13.009,
+          "object": {
+            "x": 12.5,
+            "y": 54.98,
+            "width": 3.906,
+            "height": 7.227
+          },
+          "mask": {
+            "x": 12.5,
+            "y": 54.98,
+            "width": 7.031,
+            "height": 13.009,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            162,
+            526,
+            222,
+            600
+          ]
+        },
+        {
+          "id": "bakery-muffin",
+          "label_th": "หน้ามัฟฟินเปลี่ยนสี",
+          "description": "The front-left chocolate muffin top becomes golden vanilla crumble.",
+          "x": 64.844,
+          "y": 51.855,
+          "width": 10.546,
+          "height": 11.954,
+          "object": {
+            "x": 64.844,
+            "y": 51.855,
+            "width": 5.859,
+            "height": 6.641
+          },
+          "mask": {
+            "x": 64.844,
+            "y": 51.855,
+            "width": 10.546,
+            "height": 11.954,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            951,
+            497,
+            1041,
+            565
+          ]
+        },
+        {
+          "id": "bakery-sugar",
+          "label_th": "น้ำตาลบนขนมปังเกลียวหายไป",
+          "description": "White pearl sugar is removed from the smaller rear-left spiral bun in the foreground tray.",
+          "x": 28.223,
+          "y": 72.461,
+          "width": 9.3,
+          "height": 12,
+          "object": {
+            "x": 28.223,
+            "y": 72.461,
+            "width": 7.096,
+            "height": 7.617
+          },
+          "mask": {
+            "x": 28.223,
+            "y": 72.461,
+            "width": 9.3,
+            "height": 12,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            379,
+            703,
+            488,
+            781
+          ]
+        }
+      ],
+      "registration_notes": "Camera and shelves align closely. Fine bread textures are regenerated slightly throughout the edited source. The generator also removed sugar from the adjacent larger rear-right spiral bun. The game integrator chose the smaller rear-left bun and tightened its mask to 9.3 percent width by 12 percent height to suppress the adjacent change. Use masks over the original for exact invariance elsewhere."
+    },
+    {
+      "level": 3,
+      "scene": "grocery",
+      "width": 1536,
+      "height": 1024,
+      "base": "assets/pantry-original.webp",
+      "edited": "assets/pantry-edited.webp",
+      "differences": [
+        {
+          "id": "grocery-label",
+          "label_th": "ฉลากขวดซอสเปลี่ยนสี",
+          "description": "The red center label on the second front soy-sauce bottle becomes dark green; yellow border stays.",
+          "x": 11.198,
+          "y": 24.756,
+          "width": 8.906,
+          "height": 16.699,
+          "object": {
+            "x": 11.198,
+            "y": 24.756,
+            "width": 4.948,
+            "height": 9.277
+          },
+          "mask": {
+            "x": 11.198,
+            "y": 24.756,
+            "width": 8.906,
+            "height": 16.699,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            134,
+            206,
+            210,
+            301
+          ]
+        },
+        {
+          "id": "grocery-cap",
+          "label_th": "ฝาขวดน้ำมันเปลี่ยนสี",
+          "description": "The rightmost clear cooking-oil bottle cap and tamper ring change from teal to yellow.",
+          "x": 48.828,
+          "y": 9.326,
+          "width": 5.391,
+          "height": 6.152,
+          "object": {
+            "x": 48.828,
+            "y": 9.326,
+            "width": 2.995,
+            "height": 3.418
+          },
+          "mask": {
+            "x": 48.828,
+            "y": 9.326,
+            "width": 5.391,
+            "height": 6.152,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            727,
+            78,
+            773,
+            113
+          ]
+        },
+        {
+          "id": "grocery-tin",
+          "label_th": "กระป๋องเปลี่ยนสี",
+          "description": "The middle green band of the rightmost tin stack becomes red.",
+          "x": 93.685,
+          "y": 51.123,
+          "width": 7.501,
+          "height": 15.293,
+          "object": {
+            "x": 93.685,
+            "y": 51.123,
+            "width": 4.167,
+            "height": 8.496
+          },
+          "mask": {
+            "x": 93.685,
+            "y": 51.123,
+            "width": 7.501,
+            "height": 15.293,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            1407,
+            480,
+            1471,
+            567
+          ]
+        },
+        {
+          "id": "grocery-olives",
+          "label_th": "กระเทียมเปลี่ยนเป็นมะกอก",
+          "description": "The second front garlic jar's contents become green olives.",
+          "x": 43.717,
+          "y": 56.543,
+          "width": 9.257,
+          "height": 21.445,
+          "object": {
+            "x": 43.717,
+            "y": 56.543,
+            "width": 5.143,
+            "height": 11.914
+          },
+          "mask": {
+            "x": 43.717,
+            "y": 56.543,
+            "width": 9.257,
+            "height": 21.445,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            632,
+            518,
+            711,
+            640
+          ]
+        },
+        {
+          "id": "grocery-lid",
+          "label_th": "ฝาโหลเครื่องปรุงเปลี่ยนสี",
+          "description": "The second front condiment jar on the bottom shelf has a metallic gold lid instead of red.",
+          "x": 12.63,
+          "y": 77.686,
+          "width": 10.312,
+          "height": 5.098,
+          "object": {
+            "x": 12.63,
+            "y": 77.686,
+            "width": 5.729,
+            "height": 2.832
+          },
+          "mask": {
+            "x": 12.63,
+            "y": 77.686,
+            "width": 10.312,
+            "height": 5.098,
+            "featherStart": 0.8
+          },
+          "object_pixels": [
+            150,
+            781,
+            238,
+            810
+          ]
+        }
+      ],
+      "registration_notes": "Very close product and shelf alignment, with minor image-wide texture/reflection regeneration. All five semantic changes landed. Use masks over original for exact invariance outside five areas."
+    }
+  ],
+  "prompts": {
+    "method": "built-in image_gen",
+    "base": [
+      {
+        "level": 1,
+        "name": "produce",
+        "prompt": "Use case: photorealistic-natural.\nAsset type: base photograph for a challenging spot-the-difference web game, level 1.\nPrimary request: One highly realistic photograph of a detailed produce display in a Thai wholesale supermarket. Landscape 3:2 aspect ratio, requested 1536 by 1024 pixels. It must look like a professional actual camera photograph, not an illustration.\nScene: eye-level slightly downward view of several tiered produce bins, showing the complete display without giant foreground objects. Dense but well-composed fresh vegetables and fruit in green and black crates: bunches of bananas toward upper left, cabbages and leafy greens across the back, red and yellow bell peppers near middle, tomatoes in the lower left, eggplants near middle right, limes in a lower middle bin, oranges toward lower right. Small red price card holders and red store fixtures add wholesale-store context. Include natural individual variations in produce, believable stacking, plastic crate vents, moisture sheen and real organic texture.\nComposition: a realistic 35mm retail photograph with deep focus and sharp detail across the display. Several clearly separated individual produce items visible at roughly 6–10 percent of image width; avoid microscopic clutter. The scene fills the single image, no panels.\nLighting: natural neutral fluorescent supermarket light, realistic soft shadows, restrained saturation.\nConstraints: no people, no invented brands, no readable words or numbers anywhere (price cards may be plain cream or red), no logos, no slogans, no UI, no circles, no arrows, no borders, no frames, no grids, no comparison collage. Never include the Thai tagline คู่คิดธุรกิจคุณ. No cartoon, vector, plastic toy, videogame, CGI or render appearance."
+      },
+      {
+        "level": 2,
+        "name": "bakery",
+        "prompt": "Use case: photorealistic-natural.\nAsset type: base photograph for a challenging spot-the-difference web game, level 2.\nPrimary request: One highly realistic photograph of a bakery counter and bread display inside a Thai wholesale supermarket. Landscape 3:2 aspect ratio, requested 1536 by 1024 pixels. It must look like an actual photograph from a professional camera, not an illustration.\nScene: straight-on, slightly downward view of a richly detailed bakery display. A wooden and dark metal display with two rear shelf levels and a foreground counter. Real crusty breads in baskets, a baguette basket at upper left, round sourdough loaves and rolls on a back shelf, small pastries and croissants across the mid shelf, a tray of muffins toward right, foreground trays with spiral pastries, sesame buns and a few fruit danishes. Retail bakery paper liners and one small pair of metal serving tongs. Subtle red retail accents in card holders or shelf trim. Small price cards have no readable text.\nComposition: dense, natural believable bakery arrangement, complete single scene. Deep focus; all breads and pastries sharply detailed and textured. No objects cut off in a confusing way. Several individual pastry details sized roughly 5–9 percent of image width and distributed throughout the image, suitable for five subtle localized edits later.\nLighting: realistic warm-neutral shop lighting, natural shadows, honest golden bread colors, no theatrical lighting.\nConstraints: no people, no brands, no readable words or numbers, no logos, no slogans, no UI, markers, circles, arrows, borders, grids or collage. Never include the Thai tagline คู่คิดธุรกิจคุณ. Not cartoon, illustration, toy, videogame, CGI or 3D render."
+      },
+      {
+        "level": 3,
+        "name": "grocery",
+        "prompt": "Use case: photorealistic-natural.\nAsset type: base photograph for a challenging spot-the-difference web game, level 3.\nPrimary request: One highly realistic photograph of dense condiment and grocery shelves in a Thai wholesale supermarket. Landscape 3:2 aspect ratio, requested 1536 by 1024 pixels. It must look like a real camera photograph, not an illustration.\nScene: close straight-on view of a supermarket shelving bay, three main shelf rows with a dense yet orderly assortment of realistic cooking ingredients. Upper shelf: soy sauce and cooking oil bottles with caps, spice jars, and small tins. Middle shelf: chili sauce bottles, jars of pickles, curry pastes in jars, and stacks of plain cans. Bottom shelf: condiments in squat jars, seasoning packets and bottled sauces. Different real glass, PET plastic, metal and paper materials. Bottle and jar shapes, cap colors, simple solid-color blank label blocks create believable anonymous retail packaging, with no legible lettering. Subtle red horizontal trim on shelf edge conveys a wholesale supermarket. Natural slightly imperfect product facing and varied inventory counts.\nComposition: camera square to the shelf, only mild natural perspective, deep focus with every product crisp. Products fill the single scene. Approximately 10–14 distinct facings per row, giving many rich repeated details but individual bottles and jars remain about 5–9 percent of image width, phone-readable. Keep shelves horizontal and composition clean.\nLighting: realistic neutral fluorescent store light, authentic reflections and contact shadows, natural colors.\nConstraints: no people, no invented brands, no readable words or numbers, no logos, no slogans, no UI, markers, circles, arrows, borders, grids or collage. Never include the Thai tagline คู่คิดธุรกิจคุณ. No cartoon, illustration, plastic toy, videogame, CGI or render appearance."
+      }
+    ],
+    "initial_edits": [
+      {
+        "level": 1,
+        "name": "produce",
+        "prompt": "Use case: precise-object-edit.\nAsset type: edited photograph for a five-difference game.\nInput image 1 is the exact EDIT TARGET, not just a style reference. Return one edited 1536×1024 landscape photograph with exactly the same registration and framing. Change ONLY the following FIVE small localized details, with coordinates measured from the top left in the 1536×1024 input:\n1. In the front-facing banana bunch at upper left, the small pair of upright yellow bananas around x=180,y=190: add several clearly visible natural dark-brown ripening patches to their yellow peel. Restrict this edit to approximately x=141–238,y=132–255. Do not alter the other bananas.\n2. The frontmost round pale-green cabbage at x=611,y=215, just above the red peppers: change only this cabbage into a purple/red cabbage, preserving its exact outline, size, leaf folds and shadows. Restrict to x=548–679,y=163–265.\n3. The single front yellow bell pepper with a green stem centered at x=875,y=393, directly above the green-pepper crate: change that pepper's yellow skin to natural red while preserving the stem, shape and specular highlights. Restrict to x=832–925,y=354–426.\n4. The uppermost prominent red tomato with its small green calyx centered at x=368,y=724 in the lower-left tomato bin: make its skin yellow-gold, keeping contour, calyx, position and highlights identical. Restrict to x=327–410,y=682–766.\n5. Remove only the foreground orange centered at x=1068,y=787 in the orange bin. Show the plausible orange behind it and a small natural shaded gap, without moving neighboring fruit. Restrict to x=1018–1126,y=734–846.\nPixel-preservation constraints: preserve every other vegetable, fruit, crate, price card, store fixture, background, camera angle, crop, depth of field, texture, color balance, light and shadow. No global regeneration, zoom, shift, lighting or exposure changes. Keep the exact positions and shapes of unchanged objects. All five regions must match and blend seamlessly with the unchanged original photograph.\nNo new text, branding, circles, arrows, markings, UI, border or collage. Do not include the phrase คู่คิดธุรกิจคุณ. Output is a single photorealistic edited photograph.",
+        "source": "assets/produce-original.webp"
+      },
+      {
+        "level": 2,
+        "name": "bakery",
+        "prompt": "Use case: precise-object-edit.\nAsset type: edited photograph for a five-difference game.\nInput image 1 is the exact EDIT TARGET. Return one edited 1536×1024 landscape photograph with exactly the same registration, camera and crop. Change ONLY these FIVE separated physical details, using source pixel coordinates from the top left:\n1. On the first small round sourdough loaf immediately right of the tall baguette basket, centered x=455,y=232, add one short clearly visible diagonal pale scoring cut across the upper central crust, from about x=425,y=208 to x=487,y=256. Keep the bread itself in precisely the same shape and position; only this extra crust score changes. Edit region x=400–510,y=183–279.\n2. The front-facing bread roll at the upper right, centered x=1377,y=267, immediately left of the standing oval roll: add a scattering of distinct pale sesame seeds across only its visible top. Preserve its outline and all nearby rolls. Edit region x=1319–1421,y=226–298.\n3. The frontmost croissant in the left middle pastry tray, centered around x=113,y=568 and just above the left cream price card: dip only its right-hand tip/outer third in glossy dark chocolate, keeping its exact contour and laminations elsewhere. The changed tip is around x=166,y=569. Restrict to x=127–218,y=521–614.\n4. In the muffin tray at middle right, the front-left dark chocolate muffin centered near x=991,y=535: change only its visible top from dark chocolate to golden vanilla crumble, keeping the same brown paper wrapper, height, shape and surrounding muffins. Restrict to x=942–1048,y=488–558.\n5. On the small spiral bun centered x=432,y=751 in the foreground tray, behind the larger closest spiral bun and left of the tilted large rear bun: remove only its visible white pearl sugar sprinkles, leaving the same golden glazed spiral surface with no white sugar. Do not alter any other bun. Restrict to x=373–494,y=699–794.\nStrict invariants: every other pastry, bread, basket, shelf, tray, paper liner, serving tongs, card, background, shadow, camera angle, framing, focus, color and lighting must remain exactly as in the input. Do not move anything, rescale or alter exposure. The altered regions must align seamlessly with the original.\nNo text, brands, slogans, UI, circles, arrows, markers, border or collage. Never include คู่คิดธุรกิจคุณ. Single photorealistic edited photograph only.",
+        "source": "assets/bakery-original.webp"
+      },
+      {
+        "level": 3,
+        "name": "grocery",
+        "prompt": "Use case: precise-object-edit.\nAsset type: difficult five-difference-game edited retail photograph.\nInput image 1 is the exact EDIT TARGET. Return one edited 1536×1024 photograph with precisely identical camera angle, framing and pixel registration. Change ONLY these FIVE small localized details, source coordinates from top left:\n1. Upper shelf: on the second fully visible front soy-sauce bottle from the left, centered x=171,y=242, change the red center of its rectangular label to dark green. Keep the yellow label border, bottle glass, cap, reflections and all other labels unchanged. Restrict edit to x=130–210,y=192–308.\n2. Upper shelf: the rightmost of the three clear cooking-oil bottles, centered x=747,y=199, currently has a green/teal cap. Change only that cap and its tamper ring from teal green to mustard yellow, retaining its shape and highlights. Restrict to x=718–777,y=72–119.\n3. Middle shelf, far right: in the rightmost stack of three cans, the middle can has a green band between yellow cans. Change only that green band to muted red. Keep the metal rims, adjacent yellow tins, can shape and reflections identical. Restrict to x=1394–1475,y=474–568.\n4. Middle shelf, slightly left of center: the second front glass garlic jar from the left, centered x=672,y=567, sits immediately left of the tall jar of red chilies. Replace only its pale garlic cloves with green olives in the same clear liquid, with similarly sized pieces and equal fullness. Preserve the jar, gold lid, glass reflections, and position exactly. Restrict contents edit to x=634–715,y=513–641.\n5. Bottom shelf, second front jar from the left, centered x=195,y=871: change only its flat red screw lid to metallic gold. Keep the jar contents, glass and the other red lids unchanged. Restrict to x=145–244,y=777–817.\nStrict invariants: every unlisted pixel/area should stay as in the original. Preserve all product positions, all labels not listed, all shelves, vertical supports, red shelf trim, background, perspective, crop, camera, lighting, exposure, color, sharpness and reflections. No added or removed products, no regeneration of surrounding shelves. Edited regions must blend and align with the original.\nNo text, logos, slogans, UI, circles, arrows, outlines, marks, border or collage. Never include คู่คิดธุรกิจคุณ. One photorealistic edited photograph only.",
+        "source": "assets/pantry-original.webp"
+      }
+    ],
+    "produce_repair": "Use case: precise-object-edit.\nInput image 1 is the exact edited photograph to repair. Keep its existing FOUR intentional differences (brown patches on upper-left bananas, purple front cabbage, red pepper among yellow peppers, yellow tomato) completely unchanged.\nMake ONE AND ONLY ONE additional very small localized change: the foreground orange centered at pixel x=1068,y=789 in this 1536×1024 photo, at the front of the orange crate slightly right of image center, must have unmistakably natural dark-green citrus peel instead of orange peel. Keep this fruit's exact round shape, size and position; keep its realistic small pores and highlights. Change only its skin color to green, like a green orange or large lime. Do not remove or move it. This single fruit occupies roughly x=1024–1118, y=744–833. Every other orange stays orange.\nPreserve the entire rest of the photograph as precisely as possible: all other produce, four existing edits, price cards, crates, store background, exposure, light, reflections, texture, shadows, camera, framing, perspective and focus. No regeneration or movement outside the one fruit. Output the same 1536×1024 landscape image.\nNo new text, circles, arrows, UI, markers, outlines, logos or slogans. Do not include คู่คิดธุรกิจคุณ. Single photorealistic image."
+  },
+  "runtime_notes": "Original PNG outputs are encoded as 1536x1024 WebP at quality 88. Both panels use the same original. An edited layer is visible only inside five elliptical CSS masks, with a fully opaque 76% core and feathered edge. See levels.js for the authoritative runtime coordinates and touch target sizes. Bakery sugar mask is narrowed to exclude the neighboring bun."
+}

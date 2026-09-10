@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+node_modules
+data
+_site
+tests
+*.sqlite*
+.dev.vars
+.dev.vars.*
+.wrangler

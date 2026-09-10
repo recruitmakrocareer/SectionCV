@@ -1,0 +1,38 @@
+{
+  "name": "makro-spot-the-difference",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/index.cjs",
+    "test": "node --test tests/*.test.cjs",
+    "build": "node scripts/build-site.cjs",
+    "dev:worker": "wrangler d1 migrations apply DB --local && wrangler dev",
+    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "check:worker": "wrangler deploy --dry-run --outdir .wrangler/build"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "jsdom": "29.0.0",
+    "miniflare": "^4.20260730.0",
+    "wrangler": "^4.130.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "DB": {
+        "description": "ฐานข้อมูลส่วนตัวสำหรับผู้เล่นและอันดับ ใช้ D1 บน Workers Free เท่านั้น"
+      },
+      "LINE_CHANNEL_SECRET": {
+        "description": "Channel Secret ของ LINE Login Channel 2011516015 กรอกที่ Cloudflare โดยตรง"
+      },
+      "APP_ORIGIN": {
+        "description": "URL HTTPS จริงของ Worker ไม่มี / ต่อท้าย ตั้งค่านี้หลัง Cloudflare ออก URL ให้แล้ว"
+      },
+      "ADMIN_LINE_USER_IDS": {
+        "description": "Your user ID ของผู้ดูแลจาก LINE Login Channel ใส่หลายคนคั่นด้วย comma"
+      }
+    }
+  }
+}
