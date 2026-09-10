@@ -57,6 +57,35 @@ test('bundled Worker runs in workerd with real D1 and never enables LINE without
   assert.equal((await mf.dispatchFetch(origin + '/api/admin/players')).status, 401);
 });
 
+test('setup status identifies absent configuration without exposing values or accessing D1 or LINE', async () => {
+  const deployed = await mf.dispatchFetch(origin + '/api/setup-status');
+  assert.equal(deployed.status, 200);
+  assert.equal(deployed.headers.get('Cache-Control'), 'no-store');
+  assert.deepEqual(await deployed.json(), { lineReady: false, missing: ['LINE_CHANNEL_SECRET'] });
+
+  const worker = createWorker({ lineFetch: () => assert.fail('Setup status must not contact LINE') });
+  const env = {
+    DB: { withSession: () => assert.fail('Setup status must not access player data') },
+    APP_ORIGIN: origin, LINE_CHANNEL_ID: '2011516015',
+    LINE_CHANNEL_SECRET: 'private-line-secret', ADMIN_LINE_USER_IDS: 'private-admin-identity'
+  };
+  const inspect = (bindings) => worker.fetch(new Request(origin + '/api/setup-status', {
+    headers: { Cookie: 'mk_session=private-session-token' }
+  }), bindings);
+  for (const missing of ['APP_ORIGIN', 'DB', 'LINE_CHANNEL_ID', 'LINE_CHANNEL_SECRET']) {
+    const response = await inspect({ ...env, [missing]: undefined });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { lineReady: false, missing: [missing] });
+  }
+  assert.deepEqual(await (await inspect(env)).json(), { lineReady: true, missing: [] });
+  assert.deepEqual(await (await inspect({})).json(), {
+    lineReady: false, missing: ['APP_ORIGIN', 'DB', 'LINE_CHANNEL_ID', 'LINE_CHANNEL_SECRET']
+  });
+  const invalidOrigin = { ...env, APP_ORIGIN: 'http://invalid.test/' };
+  assert.deepEqual(await (await inspect(invalidOrigin)).json(), { lineReady: false, missing: ['APP_ORIGIN'] });
+  assert.equal((await worker.fetch(new Request(origin + '/api/session'), invalidOrigin)).status, 503);
+});
+
 test('D1 OAuth consumes a browser-bound state atomically and verifies the LINE identity', async () => {
   const clock = 1800000000000, sub = 'U' + 'a'.repeat(32);
   let authorize, exchanges = 0;

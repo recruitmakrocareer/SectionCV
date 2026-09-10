@@ -83,14 +83,25 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           return env.ASSETS ? env.ASSETS.fetch(request) : json({ error: 'ไม่พบหน้าที่ต้องการ' }, 404);
         }
         let origin = null;
+        let originInvalid = false;
         if (env.APP_ORIGIN) {
           try {
             const configured = new URL(env.APP_ORIGIN);
             if (configured.origin !== env.APP_ORIGIN || configured.protocol !== 'https:') throw new Error();
             origin = configured.origin;
-          } catch { fail('กรุณาตั้งค่า URL ของระบบให้ถูกต้อง', 503); }
+          } catch { originInvalid = true; }
         }
         const lineReady = !!(origin && env.DB && env.LINE_CHANNEL_ID && env.LINE_CHANNEL_SECRET);
+        if (request.method === 'GET' && url.pathname === '/api/setup-status') {
+          // Report only fixed setting names, never values, identities or tokens.
+          // This remains usable before D1 or LINE is configured and does no I/O.
+          const configured = {
+            APP_ORIGIN: !!origin, DB: !!env.DB,
+            LINE_CHANNEL_ID: !!env.LINE_CHANNEL_ID, LINE_CHANNEL_SECRET: !!env.LINE_CHANNEL_SECRET
+          };
+          return json({ lineReady, missing: Object.keys(configured).filter((name) => !configured[name]) });
+        }
+        if (originInvalid) fail('กรุณาตั้งค่า URL ของระบบให้ถูกต้อง', 503);
         if (!env.DB) {
           if (request.method === 'GET' && url.pathname === '/api/session') return json({ lineReady: false, csrf: '', user: null, penaltyMs: PENALTY_MS });
           fail('ระบบบันทึกข้อมูลยังไม่เปิดใช้งาน', 503);

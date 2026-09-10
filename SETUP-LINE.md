@@ -49,6 +49,8 @@
 
 ก่อนใส่ Channel Secret ระบบแสดงโหมดฝึกซ้อม ไม่เปิด LINE Login อัตโนมัติจาก URL ที่ผู้เล่นส่งมา `keep_vars: true` ช่วยรักษาค่าอื่นที่ตั้งบน dashboard ระหว่าง deploy ส่วน `APP_ORIGIN` และ `LINE_CHANNEL_ID` ใช้ค่าจากไฟล์ และ Secret จะไม่อยู่ในไฟล์เว็บ
 
+หากหน้าเกมยังแสดงโหมดฝึกซ้อม ให้เปิด [สถานะการตั้งค่า](https://sectioncv.recruitcpaxtramakro.workers.dev/api/setup-status) ดูรายการ `missing` ระบบคืนเฉพาะชื่อค่าที่ขาดหรือมีรูปแบบไม่ถูกต้อง ไม่คืนค่าลับหรือข้อมูลผู้เล่น และไม่อ่านหรือเขียนฐานข้อมูล หากมี `LINE_CHANNEL_SECRET` ให้ตั้ง Secret ที่ Worker → Settings → Variables and Secrets แล้วกด Deploy; ค่าที่ใส่ใน Builds → Build variables and secrets ไม่ถูกส่งให้ Worker ขณะให้บริการ หากมี `DB` ให้ตรวจ binding ฐานข้อมูล ส่วน `APP_ORIGIN` และ `LINE_CHANNEL_ID` ให้ตรวจว่าเผยแพร่ `main` ล่าสุดแล้ว หลังแก้ไขให้โหลดหน้าเกมใหม่ `lineReady: true` และ `missing: []` ยืนยันเพียงว่าค่าที่จำเป็นมีครบ ยังต้องทดสอบ LINE Login จริงเพื่อยืนยันความถูกต้องของ Secret และ Callback
+
 อ้างอิงการตั้งค่า: [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/), [workers.dev](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/), [Wrangler configuration และการสร้างทรัพยากร](https://developers.cloudflare.com/workers/wrangler/configuration/), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)
 
 ### ผ่านเครื่องผู้ติดตั้ง
