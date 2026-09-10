@@ -6,7 +6,9 @@
 
 - โค้ดรองรับ LINE Login, ชื่อ/เบอร์ติดต่อ, อันดับรวม 10 คน, ป๊อปอัปเริ่มเกม และกดผิด +5 วินาที
 - ใช้ LINE Login Channel ID `2011516015` ตามที่ผู้ดูแลแจ้ง ยังไม่ได้ยืนยันการล็อกอินจริงกับ Channel นี้
-- ผู้ดูแลสร้าง Worker `sectioncv` และเชื่อม `DB` กับ D1 `makro-player-data` แล้ว บันทึก Database ID จริงจากภาพหน้าจอวันที่ 9 กันยายน 2026 ใน `wrangler.json` ภาพฐานข้อมูลล่าสุดยังมี 0 ตาราง จึงต้องรัน migration ผ่าน `npm run deploy` ก่อนเปิดระบบผู้เล่น การเผยแพร่ URL หลักและ LINE Login จริงยังไม่ได้ยืนยัน
+- ผู้ดูแลสร้าง Worker `sectioncv` และเชื่อม `DB` กับ D1 `makro-player-data` แล้ว บันทึก Database ID จริงใน `wrangler.json` ภาพ D1 Studio ล่าสุดยืนยันว่ามีครบ 5 ตารางและ 5 ดัชนี รวมดัชนี `idx_runs_one_active`
+- รวม PR #3 เข้า `main` เมื่อ 10 กันยายน 2026 ที่ commit `b3c7d498b6cb636bc309253d43a74bf673c5542f` และ [Cloudflare Workers Build](https://dash.cloudflare.com/98ce6428552408440b1d95e76cda8e04/workers/services/view/sectioncv/production/builds/b3d91398-2267-4dd0-8046-864b223416d5) รายงานสำเร็จ พร้อม Version ID `9963e42a-7fd6-4c2e-9fd8-9724afb1efaa`
+- กำหนด `APP_ORIGIN` เป็น `https://sectioncv.recruitcpaxtramakro.workers.dev` จากชื่อ Worker และ subdomain ที่ Cloudflare รายงานแล้ว ยังไม่ได้ยืนยันการตอบกลับ HTTP ของเว็บจริง การตั้งค่า Secret และการล็อกอิน LINE แบบครบขั้นตอน
 - [GitHub Pages เดิม](https://recruitmakrocareer.github.io/SectionCV/) ยังเป็น **โหมดฝึกซ้อมที่ไม่บันทึกอันดับ** ไม่มีข้อมูลผู้เล่นหรือบัญชี LINE จำลองในระบบจริง
 
 ## ขอบเขตแพ็กเกจฟรี
@@ -31,27 +33,27 @@
 
 ### ผ่านหน้า Cloudflare
 
-1. ตรวจว่า Workers เป็น **Free** แล้วเปิด Worker `sectioncv` ที่สร้างไว้ → **Settings → Build** ใช้ repository `recruitmakrocareer/SectionCV` และเปลี่ยน Git/Production branch เป็น `codex/create-makro-sprite-spot-the-difference-game` ซึ่งมีโค้ดเกมและชุดติดตั้งนี้ หากยังไม่ได้เชื่อม Builds ให้กด Connect แล้วเลือก repository และ branch เดียวกัน
+1. ตรวจว่า Workers เป็น **Free** แล้วเปิด Worker `sectioncv` ที่สร้างไว้ → **Settings → Build** ใช้ repository `recruitmakrocareer/SectionCV` และ Git/Production branch `main` ซึ่งรวมโค้ดเกมจาก PR #3 แล้ว หากตั้งเป็นสาขา PR ตามขั้นตอนก่อนหน้านี้ ให้เปลี่ยนกลับเป็น `main` และปิด Builds for non-production branches หากยังไม่ได้เชื่อม Builds ให้กด Connect แล้วเลือก repository และ branch เดียวกัน
 2. ชื่อ Worker ใน `wrangler.json` คือ `sectioncv` ตรงกับโครงการที่ผู้ดูแลสร้าง ตั้ง build command เป็น `npm run build`, deploy command เป็น `npm run deploy` และ root directory เป็นราก repository ใช้ Node.js 24 ขึ้นไปในสภาพแวดล้อม build ตัว deploy command จะสร้างตารางด้วย migration ก่อนเปิดเวอร์ชันใหม่ ต้องตั้งค่าฐานข้อมูลในข้อ 3 ให้เสร็จก่อนเริ่ม build
-3. ตรวจในแท็บ **Bindings** ว่า `DB` ชี้ไปยัง `makro-player-data` ที่มี ID ตรงกับไฟล์ `wrangler.json` ซึ่งตั้งค่าให้แล้ว ตรวจว่า API token ที่เลือกสำหรับ Workers Builds มีสิทธิ์ **Account → D1 → Edit** ในบัญชีนี้เพื่อรัน migration หาก build แจ้งไม่มีสิทธิ์ ให้แก้ token เดิมในบัญชี Cloudflare โดยตรง ไม่ส่ง token ในแชตหรือ GitHub จากนั้นเริ่ม build ของสาขาเกมด้วย deploy command `npm run deploy` และตรวจว่าขั้นตอน migration สำเร็จ
-4. หลัง deploy จาก branch เกมสำเร็จ ตรวจว่ามี D1 binding `DB` และ `workers.dev` เปิดใช้งาน (`workers_dev: true` เตรียมไว้ในไฟล์แล้ว) คัดลอก **URL HTTPS จริงที่ Cloudflare แสดง** แล้วไปที่ Worker → Settings → Variables and Secrets ตั้งค่าตามตารางด้านล่าง กดบันทึก/deploy ค่าตั้งแต่ละรายการ การสร้าง Worker หรือมีข้อความ Deploy สำเร็จจาก `main` เพียงอย่างเดียวยังไม่ยืนยันว่า API เกมพร้อม
-5. ใน LINE Developers ของ Channel `2011516015` → แท็บ **LINE Login** → **Callback URL** ใส่ `<URL จริงของ Worker>/auth/line/callback` ไม่มี `/` ซ้อนกัน ไม่ใช้ URL ของ GitHub Pages
+3. ตรวจในแท็บ **Bindings** ว่า `DB` ชี้ไปยัง `makro-player-data` ที่มี ID ตรงกับไฟล์ `wrangler.json` ซึ่งตั้งค่าให้แล้ว ตรวจว่า API token ที่เลือกสำหรับ Workers Builds มีสิทธิ์ **Account → D1 → Edit** ในบัญชีนี้เพื่อรัน migration หาก build แจ้งไม่มีสิทธิ์ ให้แก้ token เดิมในบัญชี Cloudflare โดยตรง ไม่ส่ง token ในแชตหรือ GitHub จากนั้นเริ่ม build ของ `main` ด้วย deploy command `npm run deploy` และตรวจว่าขั้นตอน migration สำเร็จ ตารางที่สร้างด้วยมือแล้วใช้คำสั่ง `IF NOT EXISTS` ชุดเดียวกัน จึงรัน migration ซ้ำได้
+4. หลัง deploy `main` สำเร็จ ตรวจว่ามี D1 binding `DB` และ `workers.dev` เปิดใช้งาน (`workers_dev: true` เตรียมไว้ในไฟล์แล้ว) URL ของ Worker นี้คือ `https://sectioncv.recruitcpaxtramakro.workers.dev` และตั้ง `APP_ORIGIN` ไว้ในไฟล์แล้ว ไปที่ Worker → Settings → Variables and Secrets ตั้ง Secret ตามตารางด้านล่าง แล้วกด Deploy การที่ build สำเร็จเพียงอย่างเดียวยังไม่ยืนยันว่า API และ LINE Login ใช้งานได้จริง
+5. ใน LINE Developers ของ Channel `2011516015` → แท็บ **LINE Login** → **Callback URL** ใส่ `https://sectioncv.recruitcpaxtramakro.workers.dev/auth/line/callback` แล้วบันทึก
 6. ทดสอบด้วยบัญชี Admin/Tester ของ Channel ก่อน: ล็อกอิน → กรอกชื่อ/เบอร์และยินยอม → เล่นครบสามด่าน → ตรวจอันดับและหน้าผู้ดูแล จากนั้นตั้ง Channel เป็น **Published** เมื่อพร้อมให้บุคคลทั่วไปใช้ แล้วแชร์ URL ของ Worker
 
 | ค่าบน Worker | ค่าและวิธีกรอก |
 | --- | --- |
-| `APP_ORIGIN` | URL HTTPS จริงของ Worker ไม่มี `/` ท้าย เช่นค่าที่คัดลอกจากหน้า deployment |
+| `APP_ORIGIN` | `https://sectioncv.recruitcpaxtramakro.workers.dev` เตรียมไว้ใน `wrangler.json` แล้ว หากย้ายโดเมนให้แก้ค่านี้และ Callback URL ให้ตรงกัน |
 | `LINE_CHANNEL_ID` | `2011516015` เตรียมไว้ในโค้ดแล้ว |
 | `LINE_CHANNEL_SECRET` | เลือกชนิด **Secret** แล้วกรอก Channel Secret จาก Basic settings ของ LINE Login Channel ลง Cloudflare โดยตรง ไม่ส่งในแชตหรือ GitHub |
 | `ADMIN_LINE_USER_IDS` | เลือกชนิด **Secret** แล้วกรอก **Your user ID** ของผู้ดูแลจาก Channel เดียวกัน หลายคนคั่นด้วย comma หากเว้นว่างจะไม่มีใครเปิดรายชื่อ/เบอร์ผู้เล่นได้ |
 
-ก่อนใส่ `APP_ORIGIN` และ Channel Secret ระบบแสดงโหมดฝึกซ้อม ไม่เปิด LINE Login อัตโนมัติจาก URL ที่ผู้เล่นส่งมา `keep_vars: true` ช่วยรักษาค่าที่ตั้งบน dashboard ระหว่าง deploy ส่วน Secret จะไม่อยู่ในไฟล์เว็บ
+ก่อนใส่ Channel Secret ระบบแสดงโหมดฝึกซ้อม ไม่เปิด LINE Login อัตโนมัติจาก URL ที่ผู้เล่นส่งมา `keep_vars: true` ช่วยรักษาค่าอื่นที่ตั้งบน dashboard ระหว่าง deploy ส่วน `APP_ORIGIN` และ `LINE_CHANNEL_ID` ใช้ค่าจากไฟล์ และ Secret จะไม่อยู่ในไฟล์เว็บ
 
 อ้างอิงการตั้งค่า: [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/), [workers.dev](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/), [Wrangler configuration และการสร้างทรัพยากร](https://developers.cloudflare.com/workers/wrangler/configuration/), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)
 
 ### ผ่านเครื่องผู้ติดตั้ง
 
-ใช้ Node.js 24 ขึ้นไป เริ่มจาก checkout branch ของ PR แล้วทำตามนี้หลังตรวจบัญชี Free:
+ใช้ Node.js 24 ขึ้นไป เริ่มจาก checkout `main` แล้วทำตามนี้หลังตรวจบัญชี Free:
 
 ```bash
 npm ci --ignore-scripts
