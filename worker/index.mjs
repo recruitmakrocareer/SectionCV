@@ -1,6 +1,8 @@
 import rules from '../server/game-rules.cjs';
+import statistics from '../server/statistics.cjs';
 
 const { advanceRun, PENALTY_MS, fail } = rules;
+const { boardSQL, rankSQL, summarySQL, historySQL } = statistics;
 const SESSION_MS = 7 * 86400000;
 const encoder = new TextEncoder();
 const random = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
@@ -13,16 +15,6 @@ const equal = (a, b) => {
   for (let i = 0; i < a.length; i++) difference |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return difference === 0;
 };
-
-const boardSQL = `WITH best AS (
-  SELECT r.*, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY score_ms, misses, completed_at, id) AS personal_rank
-  FROM runs r WHERE status='complete'
-) SELECT b.id, b.user_id, u.name, b.score_ms, b.misses, b.completed_at
-  FROM best b JOIN users u ON u.id=b.user_id WHERE b.personal_rank=1
-  ORDER BY b.score_ms, b.misses, b.completed_at, b.id`;
-const rankSQL = `SELECT rank FROM (
-  SELECT user_id, ROW_NUMBER() OVER (ORDER BY score_ms, misses, completed_at, id) AS rank FROM (${boardSQL})
-) WHERE user_id=?`;
 
 function readCookies(request) {
   const result = {};
@@ -182,6 +174,13 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
         if (request.method === 'GET' && url.pathname === '/api/leaderboard') {
           const { results } = await stmt(`${boardSQL} LIMIT 10`).all();
           return json({ entries: results.map((row) => ({ name: row.name, scoreMs: row.score_ms, misses: row.misses })) });
+        }
+        if (request.method === 'GET' && url.pathname === '/api/me/stats') {
+          const user = await session();
+          const [summary, rank, history] = await db.batch([
+            stmt(summarySQL, user.id), stmt(rankSQL, user.id), stmt(historySQL, user.id)
+          ]);
+          return json({ ...summary.results[0], rank: rank.results[0]?.rank ?? null, recentRuns: history.results });
         }
         if (request.method === 'GET' && ['/api/admin/players', '/api/admin/export'].includes(url.pathname)) {
           const user = await session();

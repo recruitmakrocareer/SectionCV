@@ -17,7 +17,7 @@ let mf, DB, createWorker, bundle;
 before(async () => {
   ({ createWorker } = await import('../worker/index.mjs'));
   bundle = (await build({ entryPoints: [join(root, 'worker/index.mjs')], bundle: true, write: false, format: 'esm', platform: 'browser' })).outputFiles[0].text;
-  mf = new Miniflare({ modules: true, script: bundle, compatibilityDate: '2026-07-30', d1Databases: ['DB'], bindings: { APP_ORIGIN: origin, LINE_CHANNEL_ID: '2011516015' } });
+  mf = new Miniflare({ cf: false, modules: true, script: bundle, compatibilityDate: '2026-07-30', d1Databases: ['DB'], bindings: { APP_ORIGIN: origin, LINE_CHANNEL_ID: '2011516015' } });
   DB = await mf.getD1Database('DB');
   await DB.batch(schema.split(';').map((s) => s.trim()).filter(Boolean).map((s) => DB.prepare(s)));
 });
@@ -55,6 +55,7 @@ test('bundled Worker runs in workerd with real D1 and never enables LINE without
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.equal((await mf.dispatchFetch(origin + '/auth/line/start')).status, 503);
   assert.equal((await mf.dispatchFetch(origin + '/api/admin/players')).status, 401);
+  assert.equal((await mf.dispatchFetch(origin + '/api/me/stats')).status, 401);
 });
 
 test('setup status identifies absent configuration without exposing values or accessing D1 or LINE', async () => {
@@ -235,17 +236,38 @@ test('real game client registers and completes all three stages against D1, incl
   }
   await until(() => $('#saveScoreStatus').textContent.startsWith('บันทึกแล้ว'));
   assert.match($('#saveScoreStatus').textContent, /00:35.00/);
+  await until(() => $('#leaderboardRows').textContent.includes('ผู้เล่น Cloudflare') && $('#personalCompleted').textContent === '1 ครั้ง');
   assert.match($('#leaderboardRows').textContent, /ผู้เล่น Cloudflare/);
   assert.equal($('#leaderboardRows').textContent.includes('0812345678'), false);
+  assert.equal($('#personalBest').textContent, '00:35.00');
+  assert.equal($('#resultViewStats').hidden, false);
+  $('#resultViewStats').click();
+  assert.equal($('#resultModal').hidden, true);
+  assert.equal($('#startModal').hidden, true);
+  assert.equal($('main').inert, false);
+  assert.equal(w.document.activeElement.id, 'personalStats');
+  await w.MAKRO_ACCOUNT.refreshPersonalStats();
   const retry = await f.request(finalPath, finalEvent);
   assert.equal(retry.status, 200); assert.equal(retry.body.scoreMs, 35000); assert.equal(retry.body.misses, 1);
   assert.deepEqual((await f.request(finalPath, finalEvent)).body, retry.body);
+  // A new page has no in-memory run or result; it restores history from D1.
+  const fresh = new JSDOM(readFileSync(join(root, 'index.html'), 'utf8'), { runScripts: 'outside-only', url: origin });
+  t.after(() => fresh.window.close());
+  fresh.window.AbortSignal = AbortSignal;
+  fresh.window.fetch = (path) => f.raw('/' + path);
+  fresh.window.eval(readFileSync(join(root, 'account.js'), 'utf8'));
+  await fresh.window.MAKRO_ACCOUNT.ready;
+  await until(() => fresh.window.document.querySelector('#personalCompleted').textContent === '1 ครั้ง');
+  assert.equal(fresh.window.document.querySelector('#personalBest').textContent, '00:35.00');
+  assert.match(fresh.window.document.querySelector('#personalHistoryRows').textContent, /บันทึกแล้ว.*00:35.00/);
 });
 
 test('D1 public top ten keeps one best time per player and exports contacts only to admins', async (t) => {
   const admin = await fixture(t, { admin: true });
+  let lastPlayer;
   for (let i = 0; i < 12; i++) {
     const f = await fixture(t);
+    lastPlayer = f;
     await DB.prepare('UPDATE users SET name=? WHERE id=?').bind(i === 0 ? '=formula test' : `ผู้เล่น ${i}`, f.id).run();
     for (const score of [10000 + i * 1000, 90000]) {
       await DB.prepare("INSERT INTO runs(id,user_id,status,phase,score_ms,misses,created_at,completed_at) VALUES(?,?,'complete','finished',?,0,?,?)")
@@ -255,6 +277,17 @@ test('D1 public top ten keeps one best time per player and exports contacts only
   const board = (await admin.request('/api/leaderboard')).body.entries;
   assert.equal(board.length, 10); assert.equal(board[0].scoreMs, 10000); assert.equal(board[9].scoreMs, 19000);
   assert.deepEqual(Object.keys(board[0]).sort(), ['misses', 'name', 'scoreMs']);
+  const personalResponse = await lastPlayer.raw('/api/me/stats');
+  assert.equal(personalResponse.headers.get('Cache-Control'), 'no-store');
+  const personal = await personalResponse.json();
+  assert.equal(personal.rank, 12);
+  assert.equal(personal.bestScoreMs, 21000);
+  assert.equal(personal.completedRuns, 2);
+  assert.equal(personal.recentRuns.length, 2);
+  assert.deepEqual(Object.keys(personal.recentRuns[0]).sort(), ['completedAt', 'createdAt', 'level', 'misses', 'scoreMs', 'status']);
+  assert.deepEqual((await admin.request('/api/me/stats?user_id=' + lastPlayer.id)).body,
+    { completedRuns: 0, bestScoreMs: null, rank: null, recentRuns: [] });
+  assert.equal((await lastPlayer.request('/api/me/stats', undefined, { Cookie: '' })).status, 401);
   const players = (await admin.request('/api/admin/players')).body.players;
   assert.equal(players.some((p) => p.phone === '0812345678'), true);
   const csv = await (await admin.raw('/api/admin/export')).text();
@@ -263,7 +296,7 @@ test('D1 public top ten keeps one best time per player and exports contacts only
 
 test('D1 data survives Worker and local runtime restarts', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'makro-d1-persist-'));
-  const options = { modules: true, script: bundle, compatibilityDate: '2026-07-30', d1Databases: { DB: 'persistent-test' }, d1Persist: directory };
+  const options = { cf: false, modules: true, script: bundle, compatibilityDate: '2026-07-30', d1Databases: { DB: 'persistent-test' }, d1Persist: directory };
   let runtime;
   try {
     runtime = new Miniflare(options);

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260908-players1">
+  <link rel="stylesheet" href="styles.css?v=20260910-stats1">
 </head>
 <body>
   <header class="site-header">
@@ -17,6 +17,7 @@
       <a class="active" href="#game">หน้าแรก</a>
       <a href="#howto">วิธีเล่น</a>
       <a href="#leaderboard">10 อันดับแรก</a>
+      <a href="#personalStats" data-view-stats>สถิติของฉัน</a>
     </nav>
     <button class="sound-button" id="soundToggle" aria-label="เปิดหรือปิดเสียง" aria-pressed="false">
       <span id="soundIcon">♪</span><span class="sound-label">เสียง</span>
@@ -67,6 +68,17 @@
       <div class="game-actions"><p><span>💡</span> แตะจุดต่างได้ทั้งสองภาพ<span class="zoom-tip">ใช้สองนิ้วซูมเพื่อดูรายละเอียด</span></p><button id="hintButton" type="button" disabled><span>◎</span> ใช้คำใบ้ <b id="hintCount">2</b></button></div>
     </section>
 
+    <section class="leaderboard-card" id="personalStats" tabindex="-1" aria-labelledby="personalStatsTitle">
+      <div class="leaderboard-heading"><div><p class="section-kicker">MY RESULTS</p><h2 id="personalStatsTitle">สถิติของฉัน</h2></div><button id="refreshPersonalStats" class="secondary-button" type="button">อัปเดตสถิติ</button></div>
+      <p id="personalStatsStatus" role="status">เข้าสู่ระบบด้วย LINE เพื่อดูประวัติการเล่นของคุณ</p>
+      <dl class="personal-summary" id="personalSummary" hidden>
+        <div><dt>เวลาที่ดีที่สุด</dt><dd id="personalBest">—</dd></div>
+        <div><dt>อันดับจากเวลาที่ดีที่สุด</dt><dd id="personalRank">—</dd></div>
+        <div><dt>เล่นครบ 3 ด่าน</dt><dd id="personalCompleted">0 ครั้ง</dd></div>
+      </dl>
+      <div class="table-scroll"><table id="personalHistoryTable" hidden><caption>ประวัติ 10 รอบล่าสุด · เวลาไทย</caption><thead><tr><th scope="col">เริ่มเล่น</th><th scope="col">ผลการเล่น</th><th scope="col">เวลาจัดอันดับ</th><th scope="col">กดผิด</th></tr></thead><tbody id="personalHistoryRows"></tbody></table></div>
+      <p class="privacy-caption">ดูสถิติของตัวเองได้แม้ไม่ติด 10 อันดับแรก · รอบที่เล่นครบ 3 ด่านจึงมีเวลาจัดอันดับ</p>
+    </section>
     <section class="leaderboard-card" id="leaderboard" aria-labelledby="leaderboardTitle">
       <div class="leaderboard-heading"><div><p class="section-kicker">TOP 10</p><h2 id="leaderboardTitle">10 อันดับเวลาที่ดีที่สุด</h2></div><button id="refreshLeaderboard" class="secondary-button" type="button">อัปเดตอันดับ</button></div>
       <p>เวลารวมทั้ง 3 ด่าน + กดผิดครั้งละ 5 วินาที · เก็บสถิติที่ดีที่สุดคนละ 1 อันดับ</p>
@@ -97,6 +109,7 @@
         <button id="savePlayer" type="submit" class="secondary-button">บันทึกข้อมูลผู้เล่น</button>
       </form>
       <p id="profileStatus" role="status"></p>
+      <button id="startViewStats" type="button" class="secondary-button" data-view-stats hidden>ดูสถิติของฉัน</button>
       <button id="popupStartButton" type="button" class="start-cta" disabled>กำลังโหลดภาพ…</button>
       <p id="startModeNote" class="privacy-caption">รอภาพพร้อมก่อนเริ่มจับเวลา</p>
       <div class="account-actions"><button id="logoutButton" class="secondary-button" type="button" hidden>ออกจากระบบ</button><a id="adminLink" href="admin.html" hidden>ดูข้อมูลผู้เล่น</a></div>
@@ -104,12 +117,12 @@
   </div>
   <div class="modal" id="resultModal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultMessage">
-      <div class="trophy" id="resultIcon" aria-hidden="true">🏆</div><p class="section-kicker" id="resultLabel">พบครบแล้ว!</p><h2 id="resultTitle">เก่งมาก! คุณเจอครบแล้ว</h2><p id="resultMessage">คุณตามหาจุดแตกต่างครบทั้ง 5 จุดได้สำเร็จ</p><p id="saveScoreStatus" role="status"></p><button id="retryScore" type="button" class="secondary-button" hidden>ลองบันทึกสถิติอีกครั้ง</button><div class="result-actions"><button id="playAgain" type="button">เล่นอีกครั้ง</button><button id="closeResult" type="button" class="secondary-button">กลับไปดูภาพ</button></div>
+      <div class="trophy" id="resultIcon" aria-hidden="true">🏆</div><p class="section-kicker" id="resultLabel">พบครบแล้ว!</p><h2 id="resultTitle">เก่งมาก! คุณเจอครบแล้ว</h2><p id="resultMessage">คุณตามหาจุดแตกต่างครบทั้ง 5 จุดได้สำเร็จ</p><p id="saveScoreStatus" role="status"></p><button id="retryScore" type="button" class="secondary-button" hidden>ลองบันทึกสถิติอีกครั้ง</button><div class="result-actions"><button id="resultViewStats" type="button" data-view-stats hidden>ดูสถิติของฉัน</button><button id="playAgain" type="button">เล่นอีกครั้ง</button><button id="closeResult" type="button" class="secondary-button">กลับไปดูภาพ</button></div>
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="levels.js?v=20260908-photos1"></script>
-  <script src="account.js?v=20260908-players1"></script>
-  <script src="app.js?v=20260908-players1"></script>
+  <script src="account.js?v=20260910-stats1"></script>
+  <script src="app.js?v=20260910-stats1"></script>
 </body>
 </html>

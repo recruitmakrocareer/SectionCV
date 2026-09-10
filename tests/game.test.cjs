@@ -363,3 +363,26 @@ test('wrong taps add five seconds to total score without granting extra playing 
   assert.match(g.$('#resultMessage').textContent, /01:00.00.*10.*01:10.00/);
   assert.equal(g.$('#scoreTime').textContent, '01:10.00');
 });
+
+test('finishing a ranked game keeps its result until acknowledged and preserves the server time on render', async (t) => {
+  let confirm;
+  const g = await game(t, { configure(w) {
+    w.MAKRO_ACCOUNT = { state: { lineReady: true }, canPlay: () => true,
+      startRun: async () => true, event: async () => null,
+      saveResult: () => new Promise((resolve) => { confirm = resolve; }) };
+  } });
+  g.click('#popupStartButton'); await flush();
+  for (let i = 0; i < 3; i++) {
+    g.advance(10000); g.win(i);
+    if (i < 2) { g.click('#playAgain'); await g.loadImages(); }
+  }
+  assert.equal(g.$('#playAgain').disabled, true);
+  assert.equal(g.$('#restartButton').disabled, true);
+  g.click('#playAgain');
+  assert.equal(g.$('#levelLabel').textContent, 'ด่านที่ 3 / 3');
+  confirm({ status: 'complete', scoreMs: 31500, rank: 12 }); await flush();
+  assert.equal(g.$('#playAgain').disabled, false);
+  assert.match(g.$('#saveScoreStatus').textContent, /บันทึกแล้ว.*00:31.50.*12/);
+  g.window.dispatchEvent(new g.window.Event('account:change'));
+  assert.equal(g.$('#scoreTime').textContent, '00:31.50');
+});

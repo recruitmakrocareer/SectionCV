@@ -13,7 +13,7 @@ async function account(t, handler) {
   dom.window.fetch = handler;
   dom.window.eval(script);
   await dom.window.MAKRO_ACCOUNT.ready;
-  t.after(() => dom.window.close());
+  t.after(async () => { await new Promise(setImmediate); dom.window.close(); });
   return { api: dom.window.MAKRO_ACCOUNT, window: dom.window, $: (s) => dom.window.document.querySelector(s) };
 }
 
@@ -36,6 +36,7 @@ test('configured LINE gates ranked play on a saved profile and renders names as 
   });
   assert.equal(g.api.canPlay(), false);
   await assert.rejects(g.api.startRun(), /บันทึกชื่อ/);
+  await g.api.refreshLeaderboard();
   assert.equal(g.$('#leaderboardRows img'), null);
   assert.match(g.$('#leaderboardRows').textContent, /<img/);
   assert.equal(g.$('#playerForm').hidden, false);
@@ -62,4 +63,57 @@ test('a lost final response is retried with the same event id and never reported
   assert.equal(attempts.length, 2);
   assert.deepEqual(attempts[0], attempts[1]);
   assert.equal(g.window.localStorage.length, 0);
+});
+
+test('slow result reads never block session readiness, game creation or confirmation of a saved score', async (t) => {
+  const dom = new JSDOM(html, { url: 'https://game.test/', runScripts: 'outside-only' });
+  const w = dom.window;
+  t.after(() => w.close());
+  w.AbortSignal = AbortSignal;
+  w.fetch = async (path) => {
+    if (path === 'api/session') return Response.json({ lineReady: true, csrf: 'fixture', user: { name: 'Fixture', profileComplete: true } });
+    if (path === 'api/leaderboard' || path === 'api/me/stats') return new Promise(() => {});
+    if (path === 'api/runs') return Response.json({ id: 'fixture-run' });
+    return Response.json({ status: 'complete', scoreMs: 65000, rank: 12 });
+  };
+  w.eval(script);
+  const api = w.MAKRO_ACCOUNT;
+  let ready = false;
+  api.ready.then(() => { ready = true; });
+  await new Promise(setImmediate);
+  assert.equal(ready, true, 'a pending leaderboard must not hold the start button');
+  assert.equal(await api.startRun(), true);
+  await api.event('hit', { answer: 'last' });
+  let saved;
+  api.saveResult().then((result) => { saved = result; });
+  await new Promise(setImmediate);
+  assert.equal(saved?.scoreMs, 65000, 'confirmation must not wait for leaderboard/history reads');
+});
+
+test('personal history loads for returning players outside the top ten and retries a read failure', async (t) => {
+  let fail = false;
+  const g = await account(t, async (path) => {
+    if (path === 'api/session') return Response.json({ lineReady: true, user: { name: 'Returning player', profileComplete: true } });
+    if (path === 'api/leaderboard') return Response.json({ entries: [] });
+    if (fail) throw new Error('temporary connection failure');
+    return Response.json({ completedRuns: 2, bestScoreMs: 65000, rank: 12, recentRuns: [
+      { status: 'active', level: 1, scoreMs: null, misses: 1, createdAt: 1800000002000 },
+      { status: 'failed', level: 2, scoreMs: null, misses: 2, createdAt: 1800000001000 },
+      { status: 'complete', level: 2, scoreMs: 65000, misses: 3, createdAt: 1800000000000 }
+    ] });
+  });
+  await g.api.refreshPersonalStats();
+  assert.equal(g.$('#personalBest').textContent, '01:05.00');
+  assert.equal(g.$('#personalRank').textContent, '#12');
+  assert.equal(g.$('#personalCompleted').textContent, '2 ครั้ง');
+  assert.equal(g.$('#personalHistoryRows').children.length, 3);
+  assert.match(g.$('#personalHistoryRows').textContent, /ยังเล่นไม่ครบ.*หมดเวลา.*บันทึกแล้ว/);
+  assert.equal(g.$('#startViewStats').hidden, false);
+  fail = true;
+  await g.api.refreshPersonalStats();
+  assert.match(g.$('#personalStatsStatus').textContent, /โหลดสถิติไม่สำเร็จ/);
+  assert.equal(g.$('#refreshPersonalStats').disabled, false);
+  fail = false;
+  await g.api.refreshPersonalStats();
+  assert.match(g.$('#personalStatsStatus').textContent, /สถิติที่บันทึกไว้/);
 });

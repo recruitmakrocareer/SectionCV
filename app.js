@@ -23,6 +23,8 @@
   let starting = false;
   let campaignStarted = false;
   let ranked = false;
+  let savingScore = false;
+  let confirmedScore = null;
   let resultGeneration = 0;
   const soundToggle = $('#soundToggle');
   const background = [$('header'), $('main'), $('footer')];
@@ -56,7 +58,7 @@
     return `${String(Math.floor(n / 6000)).padStart(2, '0')}:${String(Math.floor(n / 100) % 60).padStart(2, '0')}.${String(n % 100).padStart(2, '0')}`;
   };
   const totalMisses = () => completedMisses.reduce((sum, n) => sum + n, 0) + (completed[levelIndex] === null ? misses : 0);
-  const score = () => completed.reduce((sum, n) => sum + (n || 0), 0) + (completed[levelIndex] === null ? duration - remaining : 0) + totalMisses() * penaltyMs;
+  const score = () => confirmedScore ?? (completed.reduce((sum, n) => sum + (n || 0), 0) + (completed[levelIndex] === null ? duration - remaining : 0) + totalMisses() * penaltyMs);
   function syncBackground() {
     background.forEach((element) => { element.inert = !modal.hidden || !startModal.hidden; });
   }
@@ -75,19 +77,25 @@
     });
   }
   async function saveScore() {
+    if (savingScore) return;
     const generation = resultGeneration;
     $('#retryScore').hidden = true;
     if (!ranked) { $('#saveScoreStatus').textContent = 'โหมดฝึกซ้อม · ไม่บันทึกอันดับ'; return; }
+    savingScore = true;
+    render();
     $('#saveScoreStatus').textContent = 'กำลังบันทึกสถิติ… กรุณาอย่าเพิ่งปิดหน้านี้';
     try {
       const result = await account.saveResult();
       if (generation !== resultGeneration) return;
+      confirmedScore = result.scoreMs;
       $('#saveScoreStatus').textContent = `บันทึกแล้ว · เวลาจัดอันดับ ${formatScore(result.scoreMs)}${result.rank ? ` · อันดับที่ ${result.rank}` : ''}`;
       $('#scoreTime').textContent = formatScore(result.scoreMs);
     } catch (error) {
       if (generation !== resultGeneration) return;
       $('#saveScoreStatus').textContent = `ยังบันทึกสถิติไม่สำเร็จ: ${error.message}`;
       $('#retryScore').hidden = false;
+    } finally {
+      if (generation === resultGeneration) { savingScore = false; render(); }
     }
   }
 
@@ -178,12 +186,14 @@
       loading: 'กำลังโหลดภาพ…', error: 'ลองโหลดภาพอีกครั้ง', ready: `เริ่มด่านที่ ${levelIndex + 1}`,
       playing: 'หยุดพัก', paused: 'เล่นต่อ', finished: nextActionLabel()
     }[phase];
-    startButton.disabled = phase === 'loading';
-    startButton.hidden = ['loading', 'error', 'ready'].includes(phase);
-    popupStartButton.disabled = starting || phase === 'loading' || (account && !account.canPlay());
+    startButton.disabled = phase === 'loading' || starting || savingScore;
+    startButton.hidden = ['loading', 'error'].includes(phase);
+    popupStartButton.disabled = starting || savingScore || phase === 'loading' || (account && !account.canPlay());
     popupStartButton.textContent = starting ? 'กำลังเตรียมเกม…' : phase === 'loading' ? 'กำลังโหลดภาพ…' : phase === 'error' ? 'ลองโหลดภาพอีกครั้ง' : phase === 'paused' ? 'เล่นต่อ' : phase === 'finished' ? nextActionLabel() : account?.state.lineReady ? `เริ่มเกม · ด่านที่ ${levelIndex + 1}` : `เริ่มเกมฝึกซ้อม · ด่านที่ ${levelIndex + 1}`;
     restartButton.textContent = ranked ? 'เริ่มใหม่ทั้ง 3 ด่าน' : 'เริ่มด่านนี้ใหม่';
-    restartButton.disabled = ['loading', 'error', 'ready'].includes(phase);
+    restartButton.disabled = starting || savingScore || ['loading', 'error', 'ready'].includes(phase);
+    $('#playAgain').disabled = starting || savingScore;
+    $('#startViewStats').disabled = starting;
     const status = {
       loading: `กำลังเตรียมภาพด่านที่ ${levelIndex + 1}…`,
       error: 'โหลดภาพไม่สำเร็จ ตรวจการเชื่อมต่อแล้วแตะลองโหลดภาพอีกครั้ง',
@@ -244,8 +254,9 @@
     syncBackground();
     $('#saveScoreStatus').textContent = !won && ranked ? 'รอบนี้ไม่บันทึกอันดับ เริ่มใหม่ทั้ง 3 ด่านเพื่อส่งสถิติ' : '';
     $('#retryScore').hidden = true;
+    $('#resultViewStats').hidden = !finishedAll || !ranked;
     if (finishedAll) saveScore();
-    $('#playAgain').focus();
+    (finishedAll && ranked ? $('#resultViewStats') : $('#playAgain')).focus();
     playSound(won ? 'win' : 'lose');
   }
 
@@ -422,6 +433,7 @@
   }
 
   function proceed() {
+    if (starting || savingScore) return;
     if (phase !== 'finished') return;
     if (ranked && !roundWon) return resetCampaign();
     if (roundWon && levelIndex < levels.length - 1) return loadLevel(levelIndex + 1, true);
@@ -434,6 +446,7 @@
 
   function resetCampaign(autoStart = false) {
     resultGeneration += 1;
+    confirmedScore = null;
     completed.fill(null);
     completedMisses.fill(0);
     campaignStarted = false;
@@ -460,6 +473,17 @@
   restartButton.addEventListener('click', () => ranked ? resetCampaign() : resetRound());
   $('#playAgain').addEventListener('click', proceed);
   $('#closeResult').addEventListener('click', closeResult);
+  document.querySelectorAll('[data-view-stats]').forEach((button) => button.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (starting) return;
+    if (phase === 'playing') pauseGame();
+    modal.hidden = true;
+    closeStart();
+    account?.refreshPersonalStats();
+    const stats = $('#personalStats');
+    stats.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    stats.focus({ preventScroll: true });
+  }));
 
   [originalScene, playScene].forEach((scene) => scene.addEventListener('click', (event) => {
     if (event.target.closest('.hotspot') || !syncTime()) return;

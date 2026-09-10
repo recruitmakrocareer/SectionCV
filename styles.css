@@ -46,6 +46,13 @@ input:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .leaderboard-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .leaderboard-heading h2 { margin: 4px 0; font-size: 24px; }
 .leaderboard-card p { font-size: 16px; line-height: 1.6; }
+.personal-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+.personal-summary > div { background: #fff1f2; border-radius: 12px; padding: 16px; }
+.personal-summary dt { color: var(--muted); font-size: 14px; }
+.personal-summary dd { margin: 6px 0 0; color: var(--red); font-size: 25px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#personalStats { scroll-margin-top: 20px; }
+#personalHistoryTable caption { text-align: left; color: var(--muted); padding: 8px 0; font-size: 14px; }
+#personalHistoryRows td:first-child { white-space: nowrap; }
 .table-scroll { width: 100%; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 16px; text-align: left; }
 th, td { padding: 13px 12px; border-bottom: 1px solid #e6e9ed; }
@@ -59,12 +66,16 @@ tbody tr:first-child { background: #fff5d8; }
   .leaderboard-heading h2 { font-size: 21px; }
   .start-card h2 { font-size: 25px; }
   .score-strip { width: 100%; gap: 3px 12px; margin: 0; }
+  .personal-summary { gap: 8px; }
+  .personal-summary > div { padding: 10px; }
+  .personal-summary dt { font-size: 12px; }
+  .personal-summary dd { font-size: 19px; }
   th, td { padding: 10px 7px; font-size: 14px; }
 }
 .site-header { min-height: 64px; background: white; display: flex; align-items: center; padding: 10px max(4vw, 20px); gap: 20px; border-bottom: 1px solid var(--line); }
 .logo { text-decoration: none; color: var(--red); font-size: 34px; line-height: 1.15; font-weight: 800; letter-spacing: -1.5px; font-style: italic; }
 .logo span { color: var(--yellow); }
-nav { display: flex; gap: 28px; margin: 0 auto; }
+nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 20px; margin: 0 auto; }
 nav a { text-decoration: none; color: var(--muted); font-size: 14px; padding: 12px 2px; }
 nav a.active { color: var(--red); font-weight: 600; }
 .sound-button { border: 1px solid var(--line); background: #fffaf0; min-height: 44px; padding: 8px 14px; border-radius: 24px; color: #55462e; display: flex; align-items: center; gap: 8px; font-size: 14px; }

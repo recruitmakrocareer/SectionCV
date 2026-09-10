@@ -7,6 +7,7 @@ const { resolve, extname } = require('node:path');
 const levels = require('../levels.js');
 
 const { advanceRun, PENALTY_MS, LEVEL_MS, fail } = require('./game-rules.cjs');
+const { boardSQL, rankSQL, summarySQL, historySQL } = require('./statistics.cjs');
 const SESSION_MS = 7 * 86400000;
 const random = () => randomBytes(32).toString('base64url');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
@@ -106,17 +107,9 @@ function createApp(options = {}) {
       return value;
     } catch { fail('ข้อมูลไม่ถูกต้อง'); }
   }
-  const boardSQL = `WITH best AS (
-    SELECT r.*, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY score_ms, misses, completed_at, id) AS personal_rank
-    FROM runs r WHERE status='complete'
-  ) SELECT b.id, b.user_id, u.name, b.score_ms, b.misses, b.completed_at
-    FROM best b JOIN users u ON u.id=b.user_id WHERE b.personal_rank=1
-    ORDER BY b.score_ms, b.misses, b.completed_at, b.id`;
   function leaderboard() { return db.prepare(`${boardSQL} LIMIT 10`).all().map((r) => ({ name: r.name, scoreMs: r.score_ms, misses: r.misses })); }
   function rankFor(userId) {
-    const row = db.prepare(`SELECT rank FROM (
-      SELECT user_id, ROW_NUMBER() OVER (ORDER BY score_ms, misses, completed_at, id) AS rank FROM (${boardSQL})
-    ) WHERE user_id=?`).get(userId);
+    const row = db.prepare(rankSQL).get(userId);
     return row?.rank || null;
   }
   async function linePost(path, values) {
@@ -198,6 +191,11 @@ function createApp(options = {}) {
         return json(res, 200, { lineReady, csrf: user?.csrf || '', user: user ? userView(user) : null, penaltyMs: PENALTY_MS });
       }
       if (req.method === 'GET' && url.pathname === '/api/leaderboard') return json(res, 200, { entries: leaderboard() });
+      if (req.method === 'GET' && url.pathname === '/api/me/stats') {
+        const user = session(req);
+        return json(res, 200, { ...db.prepare(summarySQL).get(user.id), rank: rankFor(user.id),
+          recentRuns: db.prepare(historySQL).all(user.id) });
+      }
       if (req.method === 'GET' && url.pathname.startsWith('/api/admin/')) {
         const user = session(req);
         if (!admins.has(user.line_sub)) fail('สำหรับผู้ดูแลกิจกรรมเท่านั้น', 403);

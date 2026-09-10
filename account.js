@@ -7,6 +7,7 @@
   let queue = [];
   let flushing = null;
   let lastResult = null;
+  let statsGeneration = 0;
   const time = (ms) => {
     const value = Math.max(0, Math.round(ms / 10));
     return `${String(Math.floor(value / 6000)).padStart(2, '0')}:${String(Math.floor(value / 100) % 60).padStart(2, '0')}.${String(value % 100).padStart(2, '0')}`;
@@ -32,6 +33,7 @@
     $('#playerForm').hidden = !state.user;
     $('#logoutButton').hidden = !state.user;
     $('#adminLink').hidden = !state.user?.admin;
+    $('#startViewStats').hidden = !state.user;
     $('#savePlayer').disabled = state.saving;
     $('#playerBadge').textContent = registered ? `ผู้เล่น: ${state.user.name}` : 'ฝึกซ้อม · ไม่บันทึกอันดับ';
     if (state.user) $('#lineIdentity').textContent = `เชื่อมต่อ LINE แล้ว: ${state.user.lineName}`;
@@ -59,6 +61,50 @@
     } catch { status.textContent = 'โหลดอันดับไม่สำเร็จ กดอัปเดตอันดับเพื่อลองอีกครั้ง'; }
     finally { $('#refreshLeaderboard').disabled = false; }
   }
+  async function refreshPersonalStats() {
+    const generation = ++statsGeneration;
+    const status = $('#personalStatsStatus');
+    const button = $('#refreshPersonalStats');
+    if (!state.online || !state.user) {
+      status.textContent = 'เข้าสู่ระบบด้วย LINE เพื่อดูประวัติการเล่นของคุณ';
+      $('#personalSummary').hidden = true;
+      $('#personalHistoryTable').hidden = true;
+      button.disabled = true;
+      return;
+    }
+    button.disabled = true;
+    status.textContent = 'กำลังโหลดสถิติของคุณ…';
+    try {
+      const data = await request('api/me/stats');
+      if (generation !== statsGeneration) return;
+      $('#personalBest').textContent = data.bestScoreMs === null ? '—' : time(data.bestScoreMs);
+      $('#personalRank').textContent = data.rank === null ? '—' : `#${data.rank}`;
+      $('#personalCompleted').textContent = `${data.completedRuns} ครั้ง`;
+      $('#personalSummary').hidden = false;
+      $('#personalHistoryRows').replaceChildren();
+      const dateFormat = new Intl.DateTimeFormat('th-TH', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Bangkok' });
+      for (const run of data.recentRuns) {
+        const row = document.createElement('tr');
+        const outcome = run.status === 'complete' ? 'ครบ 3 ด่าน · บันทึกแล้ว'
+          : run.status === 'failed' ? `หมดเวลาในด่านที่ ${run.level + 1}`
+          : run.status === 'abandoned' ? 'เริ่มรอบใหม่ก่อนเล่นครบ'
+          : `ยังเล่นไม่ครบ · ด่านที่ ${run.level + 1}`;
+        [dateFormat.format(run.createdAt), outcome, run.scoreMs === null ? '—' : time(run.scoreMs), `${run.misses} ครั้ง`].forEach((value) => {
+          const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell);
+        });
+        $('#personalHistoryRows').appendChild(row);
+      }
+      $('#personalHistoryTable').hidden = !data.recentRuns.length;
+      status.textContent = data.completedRuns
+        ? 'สถิติที่บันทึกไว้ของคุณ · ดูได้แม้ไม่ติด 10 อันดับแรก'
+        : data.recentRuns.length ? 'ยังไม่มีรอบที่เล่นครบ 3 ด่าน ดูผลแต่ละรอบได้ด้านล่าง'
+        : 'ยังไม่มีประวัติการเล่นที่บันทึกในบัญชี LINE นี้';
+    } catch {
+      if (generation === statsGeneration) status.textContent = 'โหลดสถิติไม่สำเร็จ กดอัปเดตสถิติเพื่อลองอีกครั้ง';
+    } finally {
+      if (generation === statsGeneration) button.disabled = false;
+    }
+  }
   const ready = (async () => {
     try {
       if (!/^https?:$/.test(location.protocol)) throw new Error('local file');
@@ -72,7 +118,10 @@
       const authError = new URLSearchParams(location.search).get('login_error');
       if (authError) $('#profileStatus').textContent = 'เข้าสู่ระบบ LINE ไม่สำเร็จ กรุณาลองอีกครั้ง';
     } catch { state.online = false; }
-    state.loading = false; render(); await refreshLeaderboard();
+    state.loading = false; render();
+    // Session readiness and gameplay must not wait for optional result reads.
+    void refreshLeaderboard();
+    void refreshPersonalStats();
   })();
   $('#playerForm').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -89,6 +138,7 @@
     catch (error) { $('#profileStatus').textContent = error.message; }
   });
   $('#refreshLeaderboard').addEventListener('click', refreshLeaderboard);
+  $('#refreshPersonalStats').addEventListener('click', refreshPersonalStats);
   async function flush() {
     if (flushing) return flushing;
     flushing = (async () => {
@@ -101,7 +151,7 @@
     try { return await flushing; } finally { flushing = null; }
   }
   const account = {
-    state, ready, time, refreshLeaderboard,
+    state, ready, time, refreshLeaderboard, refreshPersonalStats,
     canPlay: () => !state.loading && !state.saving && (!state.lineReady || !!state.user?.profileComplete),
     async startRun() {
       await ready;
@@ -123,7 +173,10 @@
       if (!runId) return null;
       const result = await flush();
       if (result?.status !== 'complete') throw new Error('ยังบันทึกครบ 3 ด่านไม่สำเร็จ กรุณาลองอีกครั้ง');
-      await refreshLeaderboard();
+      // The event acknowledgement already confirms persistence. Show it now,
+      // even when either results panel has a slow or failed request.
+      void refreshLeaderboard();
+      void refreshPersonalStats();
       return result;
     },
     clearRun() { runId = null; queue = []; sequence = 0; lastResult = null; }

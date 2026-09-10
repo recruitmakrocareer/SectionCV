@@ -50,8 +50,12 @@ test('the real client registers a player, plays three stages and shows the serve
   }
   await until(() => $('#saveScoreStatus').textContent.startsWith('บันทึกแล้ว'));
   assert.match($('#saveScoreStatus').textContent, /00:35.00/);
+  await until(() => $('#leaderboardRows').textContent.includes('ผู้เล่นครบกระบวนการ') && $('#personalCompleted').textContent === '1 ครั้ง');
   assert.match($('#leaderboardRows').textContent, /ผู้เล่นครบกระบวนการ/);
   assert.equal($('#leaderboardRows').textContent.includes('0812345678'), false);
   const record = app.db.prepare("SELECT score_ms,misses FROM runs WHERE status='complete'").get();
   assert.equal(record.score_ms, 35000); assert.equal(record.misses, 1);
+  assert.equal($('#personalBest').textContent, '00:35.00');
+  assert.match($('#personalHistoryRows').textContent, /บันทึกแล้ว/);
+  assert.equal((await fetch(base + '/api/me/stats')).status, 401);
 });
