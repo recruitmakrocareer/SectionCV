@@ -373,3 +373,23 @@ test('90-second rankings prioritize finds, paginate all players and keep the vie
   assert.equal(anonymous.me, null); assert.equal(anonymous.entries.some((r) => r.isMe), false);
   assert.deepEqual(Object.keys(anonymous.entries[0]).sort(), ['foundCount', 'isMe', 'misses', 'name', 'rank', 'scoreMs']);
 });
+
+
+test('manual LINE login disables only auto login while retaining OAuth state, nonce and PKCE', async (t) => {
+  const f = await fixture(t);
+  const normal = await f.raw('/auth/line/start');
+  const fallback = await f.raw('/auth/line/start?manual=1');
+  const a = new URL(normal.headers.get('Location'));
+  const b = new URL(fallback.headers.get('Location'));
+  assert.equal(fallback.status, 303);
+  assert.equal(a.searchParams.has('disable_auto_login'), false);
+  assert.equal(b.searchParams.get('disable_auto_login'), 'true');
+  assert.equal(b.origin, 'https://access.line.me');
+  assert.equal(b.searchParams.get('redirect_uri'), origin + '/auth/line/callback');
+  assert.equal(b.searchParams.get('code_challenge_method'), 'S256');
+  for (const key of ['state','nonce','code_challenge']) {
+    assert.ok(b.searchParams.get(key));
+    assert.notEqual(a.searchParams.get(key), b.searchParams.get(key));
+  }
+  assert.match(fallback.headers.get('Set-Cookie'), /mk_oauth=.*HttpOnly.*SameSite=Lax.*Secure/);
+});

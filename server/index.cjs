@@ -158,6 +158,7 @@ function createApp(options = {}) {
         authorize.search = new URLSearchParams({ response_type: 'code', client_id: env.LINE_CHANNEL_ID,
           redirect_uri: callback, state, nonce, scope: 'openid profile', ui_locales: 'th',
           code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' }).toString();
+        if (url.searchParams.get('manual') === '1') authorize.searchParams.set('disable_auto_login', 'true');
         return redirect(res, authorize.href, [cookie('mk_oauth', binding, 300)]);
       }
       if (req.method === 'GET' && url.pathname === '/auth/line/callback') {

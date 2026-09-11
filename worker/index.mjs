@@ -135,6 +135,7 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           authorize.search = new URLSearchParams({ response_type: 'code', client_id: env.LINE_CHANNEL_ID,
             redirect_uri: `${origin}/auth/line/callback`, state, nonce, scope: 'openid profile', ui_locales: 'th',
             code_challenge: base64url(await digest(verifier)), code_challenge_method: 'S256' }).toString();
+          if (url.searchParams.get('manual') === '1') authorize.searchParams.set('disable_auto_login', 'true');
           return redirect(authorize.href, [cookie('mk_oauth', binding, 300)]);
         }
         if (request.method === 'GET' && url.pathname === '/auth/line/callback') {

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260911-sprint1">
+  <link rel="stylesheet" href="styles.css?v=20260911-login1">
 </head>
 <body>
   <header class="site-header">
@@ -104,7 +104,7 @@
       <p class="section-kicker">MAKRO PHOTO CHALLENGE</p><h2 id="startTitle">พร้อมจับผิดภาพแล้วหรือยัง?</h2>
       <p id="startRules">ภาพละ <strong>1 นาที 30 วินาที</strong> เวลาถอยหลังตลอด<br>หาครบหรือหมดเวลา ไปด่านถัดไปอัตโนมัติ<br>กดผิด 1 ครั้ง <strong>+5 วินาที</strong> ในเวลาจัดอันดับ</p>
       <div class="start-facts"><span>แข่งกับเวลา <b>90 วินาที</b></span><span>ทั้งหมด <b>3 ภาพ · 15 จุด</b></span><span>หาให้มาก <b>แล้วแข่งความไว</b></span></div>
-      <div id="loginPanel"><p id="loginStatus" role="status">กำลังตรวจการเข้าสู่ระบบ…</p><a id="lineLogin" class="line-button" href="auth/line/start" hidden>เข้าสู่ระบบด้วย LINE</a></div>
+      <div id="loginPanel"><p id="loginStatus" role="status">กำลังตรวจการเข้าสู่ระบบ…</p><a id="lineLogin" class="line-button" href="auth/line/start" hidden>เข้าสู่ระบบด้วย LINE</a><div id="loginHelp" hidden><p class="privacy-caption">ถ้าขึ้น Error ใน LINE ให้เปิดเกมใน Chrome/Safari แล้วเข้าสู่ระบบอีกครั้ง</p><p><a href="?openExternalBrowser=1">เปิดเกมใน Chrome/Safari</a></p><p><a href="auth/line/start?manual=1">เข้าสู่ระบบด้วย LINE แบบสำรอง</a></p></div></div>
       <form id="playerForm" hidden>
         <p id="lineIdentity"></p>
         <label for="playerName">ชื่อที่ใช้ในกิจกรรมและตารางอันดับ</label><input id="playerName" name="name" autocomplete="name" minlength="2" maxlength="80" required>
@@ -137,7 +137,7 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="levels.js?v=20260908-photos1"></script>
-  <script src="account.js?v=20260911-sprint1"></script>
-  <script src="app.js?v=20260911-sprint1"></script>
+  <script src="account.js?v=20260911-login1"></script>
+  <script src="app.js?v=20260911-login1"></script>
 </body>
 </html>

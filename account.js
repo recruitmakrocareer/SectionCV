@@ -30,6 +30,7 @@
     const registered = !!state.user?.profileComplete;
     $('#loginPanel').hidden = !!state.user;
     $('#lineLogin').hidden = !state.lineReady;
+    $('#loginHelp').hidden = !state.lineReady;
     $('#loginStatus').textContent = state.loading ? 'กำลังตรวจการเข้าสู่ระบบ…' : state.lineReady
       ? 'เข้าสู่ระบบด้วย LINE แล้วกรอกข้อมูลเพื่อร่วมจัดอันดับ'
       : 'เปิดให้ฝึกซ้อมได้ ระบบ LINE และการบันทึกอันดับยังไม่เปิดใช้งาน';
