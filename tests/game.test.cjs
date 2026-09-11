@@ -43,6 +43,7 @@ async function game(t, { configure = () => {}, load = true } = {}) {
     click: (selector) => $(selector).click(),
     hit: (id, side = 'different') => $(`[data-scene="${side}"] [data-id="${id}"]`).click(),
     win(index) { levels[index].differences.forEach((point, i) => g.hit(point.id, i % 2 ? 'original' : 'different')); },
+    async nextLevel() { g.advance(2000); await g.loadImages(); },
     async loadImages(fail = '') {
       for (const image of window.document.querySelectorAll('.pictures img')) {
         image.readyInTest = image.id !== fail;
@@ -70,7 +71,7 @@ test('cannot start before the photos load and recovers from a failed image reque
   assert.equal(g.$('#startButton').disabled, true);
   g.click('#startButton');
   g.advance(180_000);
-  assert.equal(g.$('#timer').textContent, '02:00');
+  assert.equal(g.$('#timer').textContent, '01:30');
   await g.loadImages('differenceImage');
   assert.equal(g.$('.pictures').dataset.state, 'error');
   assert.equal(g.$('#startButton').disabled, false);
@@ -86,7 +87,7 @@ test('cannot start before the photos load and recovers from a failed image reque
 test('waits for Start and counts the same answer in either photograph only once', async (t) => {
   const g = await game(t);
   g.advance(60_000);
-  assert.equal(g.$('#timer').textContent, '02:00');
+  assert.equal(g.$('#timer').textContent, '01:30');
   g.hit(first());
   assert.equal(g.$('#foundCount').textContent, '0');
   g.click('#startButton');
@@ -111,19 +112,17 @@ test('completes all three levels in order, totals 15 answers, then starts a fres
     assert.equal(g.$('#foundCount').textContent, '5');
     assert.equal(g.$('#progressText').textContent, '100%');
     assert.equal(g.$('#gameProgress').getAttribute('aria-valuenow'), '5');
-    assert.equal(g.$('#resultModal').hidden, false);
-    assert.equal(g.window.document.activeElement, g.$('#playAgain'));
+    assert.equal(g.$('#resultModal').hidden, index < 2);
     assert.equal(g.intervals.size, 0);
     assert.equal(g.window.document.querySelectorAll('#levelTracker .completed').length, index + 1);
     if (index < 2) {
-      assert.equal(g.$('#playAgain').textContent, `ไปด่านที่ ${index + 2}`);
-      g.click('#playAgain');
-      g.click('#playAgain'); // Rapid double clicks must not skip a level.
+      assert.equal(g.$('#stageTransition').hidden, false);
+      g.click('#playAgain'); // A stray click cannot skip the automatic transition.
       assert.equal(g.intervals.size, 0);
+      await g.nextLevel();
       assert.equal(g.$('#foundCount').textContent, '0');
       assert.equal(g.$('#hintCount').textContent, '2');
       assert.equal(g.$('#resultModal').hidden, true);
-      await g.loadImages();
       assert.equal(g.intervals.size, 1);
     }
   }
@@ -132,27 +131,28 @@ test('completes all three levels in order, totals 15 answers, then starts a fres
   g.click('#playAgain');
   await g.loadImages();
   assert.equal(g.$('#levelTitle').textContent, levels[0].title);
-  assert.equal(g.$('#timer').textContent, '02:00');
+  assert.equal(g.$('#timer').textContent, '01:30');
   assert.equal(g.$('#foundCount').textContent, '0');
   assert.equal(g.window.document.querySelectorAll('#levelTracker .completed').length, 0);
   assert.equal(g.intervals.size, 1);
 });
 
-test('losing level two retries that level and preserves the completed first level', async (t) => {
+test('expiry keeps partial finds and advances to the next stage automatically', async (t) => {
   const g = await game(t);
-  g.click('#startButton'); g.win(0); g.click('#playAgain'); await g.loadImages();
+  g.click('#startButton'); g.win(0); await g.nextLevel();
   g.hit(levels[1].differences[0].id);
-  g.advance(120_000);
-  assert.equal(g.$('#resultLabel').textContent, 'หมดเวลา');
-  assert.equal(g.$('#playAgain').textContent, 'ลองด่านนี้อีกครั้ง');
+  g.advance(90_000);
+  assert.equal(g.$('#stageTransitionTitle').textContent, 'หมดเวลา!');
   assert.equal(g.window.document.querySelectorAll('.revealed').length, 8);
-  g.click('#playAgain');
-  assert.equal(g.$('#levelTitle').textContent, levels[1].title);
-  assert.equal(g.$('#timer').textContent, '02:00');
+  await g.nextLevel();
+  assert.equal(g.$('#levelTitle').textContent, levels[2].title);
+  assert.equal(g.$('#timer').textContent, '01:30');
   assert.equal(g.$('#foundCount').textContent, '0');
-  assert.equal(g.window.document.querySelectorAll('#levelTracker .completed').length, 1);
-  g.win(1);
-  assert.equal(g.$('#playAgain').textContent, 'ไปด่านที่ 3');
+  assert.equal(g.window.document.querySelectorAll('#levelTracker .completed').length, 2);
+  g.advance(90_000);
+  assert.equal(g.$('#resultModal').hidden, false);
+  assert.equal(g.$('#resultFound').textContent, '6 / 15');
+  assert.match(g.$('#resultStages').textContent, /หมดเวลา/);
 });
 
 test('hints are distinct, exclude found answers and reset when the next scene loads', async (t) => {
@@ -164,7 +164,7 @@ test('hints are distinct, exclude found answers and reset when the next scene lo
   assert.equal(g.$('#foundCount').textContent, '1');
   assert.equal(g.$('#hintCount').textContent, '0');
   assert.equal(g.$('#hintButton').disabled, true);
-  g.win(0); g.click('#playAgain'); await g.loadImages();
+  g.win(0); await g.nextLevel();
   assert.equal(g.$('#hintCount').textContent, '2');
   assert.equal(g.$('.hint'), null);
   assert.equal(g.$('.found'), null);
@@ -173,67 +173,69 @@ test('hints are distinct, exclude found answers and reset when the next scene lo
   assert.equal(g.$('.hotspot').getAttribute('aria-label'), 'จุดแตกต่างที่ 1');
 });
 
-test('pause and backgrounding preserve exact remaining time and require manual resume', async (t) => {
+test('the visible countdown keeps running while the tab is in the background', async (t) => {
   const g = await game(t);
   g.click('#startButton'); g.advance(12_400); g.click('#startButton');
-  assert.equal(g.$('#timer').textContent, '01:48');
-  g.advance(180_000); g.hit(first());
-  assert.equal(g.$('#foundCount').textContent, '0');
-  g.click('#startButton'); g.advance(600);
-  assert.equal(g.$('#timer').textContent, '01:47');
+  assert.equal(g.$('#timer').textContent, '01:17');
+  assert.equal(g.$('#timerTenths').textContent, '.6');
+  assert.equal(g.$('#startButton').disabled, true);
   Object.defineProperty(g.window.document, 'hidden', { configurable: true, value: true });
   g.window.document.dispatchEvent(new g.window.Event('visibilitychange'));
-  g.advance(240_000);
-  assert.equal(g.$('.pictures').dataset.state, 'paused');
-  assert.equal(g.$('#timer').textContent, '01:47');
-  assert.equal(g.intervals.size, 0);
+  g.advance(68400);
+  assert.equal(g.$('.pictures').dataset.state, 'playing');
+  assert.equal(g.$('#timer').textContent, '00:09');
+  assert.equal(g.$('#countdownHud').dataset.urgency, 'critical');
+  assert.match(g.$('#countdownBar').style.transform, /scaleX\(0\.1/);
+  assert.equal(g.intervals.size, 1);
 });
 
-test('a next-level image load completing in a hidden tab does not start its timer', async (t) => {
+test('automatic stage changes continue in a hidden tab without a pause advantage', async (t) => {
   const g = await game(t);
-  g.click('#startButton'); g.win(0); g.click('#playAgain');
+  g.click('#startButton'); g.win(0);
   Object.defineProperty(g.window.document, 'hidden', { configurable: true, value: true });
-  await g.loadImages();
-  g.advance(180_000);
-  assert.equal(g.$('.pictures').dataset.state, 'ready');
-  assert.equal(g.$('#timer').textContent, '02:00');
-  assert.equal(g.intervals.size, 0);
+  await g.nextLevel(); g.advance(10000);
+  assert.equal(g.$('.pictures').dataset.state, 'playing');
+  assert.equal(g.$('#timer').textContent, '01:20');
+  assert.equal(g.intervals.size, 1);
 });
 
 test('a late last answer cannot win after the deadline even if timer callbacks are delayed', async (t) => {
   const g = await game(t);
   g.click('#startButton');
   levels[0].differences.slice(0, 4).forEach((point) => g.hit(point.id));
-  g.advance(120_001, false);
+  g.advance(90_001, false);
   g.hit(levels[0].differences[4].id);
   assert.equal(g.$('#foundCount').textContent, '4');
   assert.equal(g.$('#timer').textContent, '00:00');
-  assert.equal(g.$('#resultLabel').textContent, 'หมดเวลา');
+  assert.equal(g.$('#stageTransitionTitle').textContent, 'หมดเวลา!');
   assert.equal(g.window.document.querySelectorAll('.revealed').length, 2);
-  g.advance(180_000);
-  assert.equal(g.$('#timer').textContent, '00:00');
+  await g.nextLevel();
+  assert.equal(g.$('#totalFoundLabel').textContent, 'รวม 4 / 15 จุด');
 });
 
 test('restarting a round clears transient feedback without a late result appearing', async (t) => {
   const g = await game(t);
   g.click('#startButton'); g.hit(first()); g.click('#hintButton'); g.click('#playScene'); g.click('#restartButton');
+  await g.loadImages();
   assert.equal(g.$('.pictures').dataset.state, 'ready');
   assert.equal(g.$('.miss'), null);
   assert.equal(g.$('.found'), null);
   assert.equal(g.$('.hint'), null);
   g.advance(240_000);
   assert.equal(g.$('#resultModal').hidden, true);
-  assert.equal(g.$('#timer').textContent, '02:00');
+  assert.equal(g.$('#timer').textContent, '01:30');
   assert.equal(g.intervals.size, 0);
 });
 
 test('result dialog traps Tab, closes with Escape and returns focus to the game', async (t) => {
   const g = await game(t);
-  g.click('#startButton'); g.advance(120_000);
-  g.$('#playAgain').dispatchEvent(new g.window.KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
+  g.click('#startButton');
+  for (let i = 0; i < 3; i++) { g.win(i); if (i < 2) await g.nextLevel(); }
+  g.$('#refreshResultBoard').focus();
+  g.$('#refreshResultBoard').dispatchEvent(new g.window.KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
   assert.equal(g.window.document.activeElement, g.$('#closeResult'));
   g.$('#closeResult').dispatchEvent(new g.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
-  assert.equal(g.window.document.activeElement, g.$('#playAgain'));
+  assert.equal(g.window.document.activeElement, g.$('#refreshResultBoard'));
   g.$('#playAgain').dispatchEvent(new g.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   assert.equal(g.$('#resultModal').hidden, true);
   assert.equal(g.window.document.activeElement, g.$('#startButton'));
@@ -297,7 +299,7 @@ test('each level uses two local photographs and exactly five bounded edit region
     });
     if (i === 0) g.click('#startButton');
     g.win(i);
-    if (i < 2) { g.click('#playAgain'); await g.loadImages(); }
+    if (i < 2) await g.nextLevel();
   }
 });
 
@@ -350,17 +352,16 @@ test('wrong taps add five seconds to total score without granting extra playing 
   g.click('#popupStartButton');
   g.advance(10000);
   g.click('#playScene'); g.click('#playScene');
-  assert.equal(g.$('#timer').textContent, '01:50');
+  assert.equal(g.$('#timer').textContent, '01:20');
   assert.equal(g.$('#scoreTime').textContent, '00:20.00');
   assert.match(g.$('#penaltySummary').textContent, /2 ครั้ง · \+10/);
-  g.click('#startButton'); // paused taps do not incur penalties
-  g.click('#playScene');
-  assert.equal(g.$('#scoreTime').textContent, '00:20.00');
-  g.click('#startButton');
-  g.win(0); g.click('#playAgain'); await g.loadImages();
-  g.advance(20000); g.win(1); g.click('#playAgain'); await g.loadImages();
+  assert.ok(g.$('.tap-feedback.wrong'));
+  g.win(0); g.click('#playScene'); // Transition taps do not incur a penalty.
+  await g.nextLevel();
+  g.advance(20000); g.win(1); await g.nextLevel();
   g.advance(30000); g.win(2);
-  assert.match(g.$('#resultMessage').textContent, /01:00.00.*10.*01:10.00/);
+  assert.match(g.$('#resultMessage').textContent, /01:00.00.*10/);
+  assert.equal(g.$('#resultTime').textContent, '01:10.00');
   assert.equal(g.$('#scoreTime').textContent, '01:10.00');
 });
 
@@ -374,7 +375,7 @@ test('finishing a ranked game keeps its result until acknowledged and preserves 
   g.click('#popupStartButton'); await flush();
   for (let i = 0; i < 3; i++) {
     g.advance(10000); g.win(i);
-    if (i < 2) { g.click('#playAgain'); await g.loadImages(); }
+    if (i < 2) await g.nextLevel();
   }
   assert.equal(g.$('#playAgain').disabled, true);
   assert.equal(g.$('#restartButton').disabled, true);

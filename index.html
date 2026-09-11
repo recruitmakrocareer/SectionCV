@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260910-stats1">
+  <link rel="stylesheet" href="styles.css?v=20260911-sprint1">
 </head>
 <body>
   <header class="site-header">
@@ -16,7 +16,7 @@
     <nav aria-label="เมนูหลัก">
       <a class="active" href="#game">หน้าแรก</a>
       <a href="#howto">วิธีเล่น</a>
-      <a href="#leaderboard">10 อันดับแรก</a>
+      <a href="#leaderboard">อันดับผู้เล่น</a>
       <a href="#personalStats" data-view-stats>สถิติของฉัน</a>
     </nav>
     <button class="sound-button" id="soundToggle" aria-label="เปิดหรือปิดเสียง" aria-pressed="false">
@@ -27,14 +27,9 @@
   <main id="game">
     <section class="hero">
       <div class="sparkle sparkle-one">✦</div><div class="sparkle sparkle-two">✦</div>
-      <p class="kicker">3 ด่าน · 15 จุดต่าง</p>
+      <p class="kicker">90 SECOND CHALLENGE · 3 ด่าน</p>
       <h1>เกม<span>จับผิดภาพ</span></h1>
-      <p class="hero-copy">3 ด่าน · ด่านละ 5 จุด ใน 2 นาที · กดผิดบวกเวลาจัดอันดับครั้งละ 5 วินาที</p>
-      <div class="game-stats">
-        <div class="stat"><span class="stat-icon clock-icon">◷</span><div><small>เวลาที่เหลือ</small><strong id="timer" role="timer" aria-label="เวลาที่เหลือ">02:00</strong></div></div>
-        <div class="divider"></div>
-        <div class="stat"><span class="stat-icon target-icon">◎</span><div><small>พบในด่านนี้</small><strong><span id="foundCount">0</span><em>/5 จุด</em></strong></div></div>
-      </div>
+      <p class="hero-copy">ภาพละ 1 นาที 30 วินาที · หาให้ไว ก่อนเวลาจะหมด!</p>
       <div class="score-strip"><span>เวลาจัดอันดับ <b id="scoreTime">00:00.00</b></span><span id="penaltySummary">กดผิด 0 ครั้ง · +0 วินาที</span><span id="playerBadge">ฝึกซ้อม · ไม่บันทึกอันดับ</span></div>
     </section>
 
@@ -50,6 +45,12 @@
         <div class="progress-wrap"><div class="progress-info"><span>ความคืบหน้า</span><b id="progressText">0%</b></div><div class="progress" id="gameProgress" role="progressbar" aria-label="จุดต่างที่พบ" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"><i id="progressBar"></i></div></div>
       </div>
 
+      <div class="countdown-hud" id="countdownHud" data-urgency="normal">
+        <div class="hud-stage"><span>กำลังเล่น</span><strong id="hudLevel">ด่าน 1 / 3</strong><small id="totalFoundLabel">รวม 0 / 15 จุด</small></div>
+        <div class="hud-clock"><small id="countdownLabel">เวลาที่เหลือ</small><div><strong id="timer" role="timer" aria-label="เวลาที่เหลือ">01:30</strong><span id="timerTenths" aria-hidden="true">.0</span></div></div>
+        <div class="hud-found"><span>พบในภาพนี้</span><strong><b id="foundCount">0</b><small> / 5</small></strong><small>จุดแตกต่าง</small></div>
+        <div class="countdown-track" aria-hidden="true"><i id="countdownBar"></i></div>
+      </div>
       <div class="pictures" data-state="loading" aria-busy="true">
         <article class="picture-panel">
           <span class="picture-label">ภาพต้นฉบับ</span>
@@ -64,6 +65,7 @@
             <img class="difference-layer" id="differenceImage" width="1536" height="1024" alt="" aria-hidden="true" draggable="false">
           </div>
         </article>
+        <div id="stageTransition" class="stage-transition" role="status" hidden><div><span id="stageTransitionIcon">⏱</span><h3 id="stageTransitionTitle">หมดเวลา!</h3><p id="stageTransitionText"></p><strong id="stageTransitionCount">2</strong></div></div>
       </div>
       <div class="game-actions"><p><span>💡</span> แตะจุดต่างได้ทั้งสองภาพ<span class="zoom-tip">ใช้สองนิ้วซูมเพื่อดูรายละเอียด</span></p><button id="hintButton" type="button" disabled><span>◎</span> ใช้คำใบ้ <b id="hintCount">2</b></button></div>
     </section>
@@ -72,23 +74,26 @@
       <div class="leaderboard-heading"><div><p class="section-kicker">MY RESULTS</p><h2 id="personalStatsTitle">สถิติของฉัน</h2></div><button id="refreshPersonalStats" class="secondary-button" type="button">อัปเดตสถิติ</button></div>
       <p id="personalStatsStatus" role="status">เข้าสู่ระบบด้วย LINE เพื่อดูประวัติการเล่นของคุณ</p>
       <dl class="personal-summary" id="personalSummary" hidden>
-        <div><dt>เวลาที่ดีที่สุด</dt><dd id="personalBest">—</dd></div>
-        <div><dt>อันดับจากเวลาที่ดีที่สุด</dt><dd id="personalRank">—</dd></div>
-        <div><dt>เล่นครบ 3 ด่าน</dt><dd id="personalCompleted">0 ครั้ง</dd></div>
+        <div><dt>ผลงานที่ดีที่สุด</dt><dd id="personalBest">—</dd><small id="personalBestFound"></small></div>
+        <div><dt>อันดับของคุณ</dt><dd id="personalRank">—</dd></div>
+        <div><dt>เล่นจบ 3 ด่าน</dt><dd id="personalCompleted">0 ครั้ง</dd></div>
       </dl>
       <div class="table-scroll"><table id="personalHistoryTable" hidden><caption>ประวัติ 10 รอบล่าสุด · เวลาไทย</caption><thead><tr><th scope="col">เริ่มเล่น</th><th scope="col">ผลการเล่น</th><th scope="col">เวลาจัดอันดับ</th><th scope="col">กดผิด</th></tr></thead><tbody id="personalHistoryRows"></tbody></table></div>
-      <p class="privacy-caption">ดูสถิติของตัวเองได้แม้ไม่ติด 10 อันดับแรก · รอบที่เล่นครบ 3 ด่านจึงมีเวลาจัดอันดับ</p>
+      <p class="privacy-caption">อันดับจากกติกา 90 วินาที · พบจุดมากกว่าอยู่อันดับดีกว่า เมื่อเท่ากันใช้เวลารวมและโทษกดผิด</p>
     </section>
     <section class="leaderboard-card" id="leaderboard" aria-labelledby="leaderboardTitle">
-      <div class="leaderboard-heading"><div><p class="section-kicker">TOP 10</p><h2 id="leaderboardTitle">10 อันดับเวลาที่ดีที่สุด</h2></div><button id="refreshLeaderboard" class="secondary-button" type="button">อัปเดตอันดับ</button></div>
-      <p>เวลารวมทั้ง 3 ด่าน + กดผิดครั้งละ 5 วินาที · เก็บสถิติที่ดีที่สุดคนละ 1 อันดับ</p>
+      <div class="leaderboard-heading"><div><p class="section-kicker">LEADERBOARD</p><h2 id="leaderboardTitle">อันดับผู้เล่นทั้งหมด</h2></div><button id="refreshLeaderboard" class="secondary-button" type="button">อัปเดตอันดับ</button></div>
+      <p>พบจุดมากที่สุด → เวลารวม + กดผิดครั้งละ 5 วินาที · ใช้ผลงานที่ดีที่สุดคนละ 1 อันดับ</p>
+      <div class="community-stats"><span>ผู้เล่น <b data-total-players>—</b> คน</span><span>เล่นจบ <b data-total-runs>—</b> รอบ</span><span>พบเฉลี่ย <b data-average-found>—</b> / 15 จุด</span></div>
+      <p data-my-standing class="my-standing"></p>
       <p id="leaderboardStatus" role="status">กำลังโหลดอันดับ…</p>
-      <div class="table-scroll"><table id="leaderboardTable" hidden><thead><tr><th scope="col">อันดับ</th><th scope="col">ผู้เล่น</th><th scope="col">เวลารวม</th><th scope="col">กดผิด</th></tr></thead><tbody id="leaderboardRows"></tbody></table></div>
+      <div class="table-scroll"><table id="leaderboardTable" hidden><thead><tr><th scope="col">อันดับ</th><th scope="col">ผู้เล่น</th><th scope="col">พบจุด</th><th scope="col">เวลารวม</th><th scope="col">กดผิด</th></tr></thead><tbody id="leaderboardRows"></tbody></table></div>
+      <div class="board-pagination"><button class="secondary-button" type="button" data-board-prev disabled>ก่อนหน้า</button><span data-board-page>หน้า 1 / 1</span><button class="secondary-button" type="button" data-board-next disabled>ถัดไป</button></div>
       <p class="privacy-caption">แสดงเฉพาะชื่อและสถิติการเล่น เบอร์ติดต่อดูได้เฉพาะผู้ดูแลกิจกรรม</p>
     </section>
     <section class="how-to" id="howto">
       <p class="section-kicker">HOW TO PLAY</p><h2>วิธีเล่นง่าย ๆ</h2>
-      <div class="steps"><article><b>1</b><span>👀</span><h3>สังเกตภาพ</h3><p>เปรียบเทียบภาพทั้งสองด้าน<br>อย่างละเอียด</p></article><i></i><article><b>2</b><span>☝️</span><h3>แตะจุดต่าง</h3><p>เจอแล้วแตะที่ตำแหน่ง<br>ในภาพใดก็ได้</p></article><i></i><article><b>3</b><span>🎉</span><h3>ค้นหาให้ครบ</h3><p>หาครบ 5 จุดแล้วไปด่านถัดไป<br>ผ่านให้ครบทั้ง 3 ด่าน</p></article></div>
+      <div class="steps"><article><b>1</b><span>👀</span><h3>90 วินาทีต่อภาพ</h3><p>เวลานับถอยหลังต่อเนื่อง<br>เห็นชัดตลอดการเล่น</p></article><i></i><article><b>2</b><span>☝️</span><h3>แตะจุดต่าง</h3><p>กดถูกได้จุด กดผิด +5 วินาที<br>ในเวลาที่ใช้จัดอันดับ</p></article><i></i><article><b>3</b><span>🎉</span><h3>ลุ้นอันดับของคุณ</h3><p>หมดเวลาหรือหาครบ ไปภาพถัดไป<br>จบ 3 ด่าน ดูผลและอันดับทันที</p></article></div>
     </section>
   </main>
 
@@ -97,8 +102,8 @@
   <div class="modal start-modal" id="startModal">
     <div class="modal-card start-card" role="dialog" aria-modal="true" aria-labelledby="startTitle" aria-describedby="startRules">
       <p class="section-kicker">MAKRO PHOTO CHALLENGE</p><h2 id="startTitle">พร้อมจับผิดภาพแล้วหรือยัง?</h2>
-      <p id="startRules">หาจุดต่างให้ครบ 15 จุดใน 3 ด่าน<br>กดผิด 1 ครั้ง <strong>+5 วินาที</strong> ในเวลาจัดอันดับ</p>
-      <div class="start-facts"><span>ด่านละ <b>2 นาที</b></span><span>คำใบ้ <b>2 ครั้ง/ด่าน</b></span><span>ยิ่งเร็ว <b>อันดับยิ่งดี</b></span></div>
+      <p id="startRules">ภาพละ <strong>1 นาที 30 วินาที</strong> เวลาถอยหลังตลอด<br>หาครบหรือหมดเวลา ไปด่านถัดไปอัตโนมัติ<br>กดผิด 1 ครั้ง <strong>+5 วินาที</strong> ในเวลาจัดอันดับ</p>
+      <div class="start-facts"><span>แข่งกับเวลา <b>90 วินาที</b></span><span>ทั้งหมด <b>3 ภาพ · 15 จุด</b></span><span>หาให้มาก <b>แล้วแข่งความไว</b></span></div>
       <div id="loginPanel"><p id="loginStatus" role="status">กำลังตรวจการเข้าสู่ระบบ…</p><a id="lineLogin" class="line-button" href="auth/line/start" hidden>เข้าสู่ระบบด้วย LINE</a></div>
       <form id="playerForm" hidden>
         <p id="lineIdentity"></p>
@@ -116,13 +121,23 @@
     </div>
   </div>
   <div class="modal" id="resultModal" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultMessage">
-      <div class="trophy" id="resultIcon" aria-hidden="true">🏆</div><p class="section-kicker" id="resultLabel">พบครบแล้ว!</p><h2 id="resultTitle">เก่งมาก! คุณเจอครบแล้ว</h2><p id="resultMessage">คุณตามหาจุดแตกต่างครบทั้ง 5 จุดได้สำเร็จ</p><p id="saveScoreStatus" role="status"></p><button id="retryScore" type="button" class="secondary-button" hidden>ลองบันทึกสถิติอีกครั้ง</button><div class="result-actions"><button id="resultViewStats" type="button" data-view-stats hidden>ดูสถิติของฉัน</button><button id="playAgain" type="button">เล่นอีกครั้ง</button><button id="closeResult" type="button" class="secondary-button">กลับไปดูภาพ</button></div>
+    <div class="modal-card result-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultMessage">
+      <div class="trophy" id="resultIcon" aria-hidden="true">🏆</div><p class="section-kicker" id="resultLabel">CHALLENGE COMPLETE</p><h2 id="resultTitle">จบทั้ง 3 ด่านแล้ว!</h2><p id="resultMessage"></p>
+      <div class="result-metrics"><div><span>จุดที่พบ</span><strong id="resultFound">0 / 15</strong></div><div><span>เวลารวมโทษกดผิด</span><strong id="resultTime">00:00.00</strong></div><div><span>กดผิด</span><strong id="resultMisses">0 ครั้ง</strong></div></div>
+      <ol id="resultStages" class="result-stages"></ol>
+      <p id="saveScoreStatus" role="status"></p><button id="retryScore" type="button" class="secondary-button" hidden>ลองบันทึกสถิติอีกครั้ง</button>
+      <section class="result-ranking" aria-label="อันดับของคุณและผู้เล่นทั้งหมด"><div class="rank-banner"><span>อันดับของคุณ · จากผลงานที่ดีที่สุด</span><strong id="resultRank">—</strong><small id="resultRankNote">กำลังโหลดอันดับ…</small></div>
+        <div class="community-stats"><span>ผู้เล่น <b data-total-players>—</b> คน</span><span>เล่นจบ <b data-total-runs>—</b> รอบ</span></div><p data-my-standing class="my-standing"></p>
+        <div class="leaderboard-heading"><h3>อันดับผู้เล่นทั้งหมด</h3><button id="refreshResultBoard" type="button" class="secondary-button">อัปเดตอันดับ</button></div><p id="resultBoardStatus" role="status"></p>
+        <div class="table-scroll"><table id="resultBoardTable" hidden><thead><tr><th scope="col">อันดับ</th><th scope="col">ผู้เล่น</th><th scope="col">พบจุด</th><th scope="col">เวลารวม</th><th scope="col">กดผิด</th></tr></thead><tbody id="resultBoardRows"></tbody></table></div>
+        <div class="board-pagination"><button type="button" class="secondary-button" data-board-prev disabled>ก่อนหน้า</button><span data-board-page>หน้า 1 / 1</span><button type="button" class="secondary-button" data-board-next disabled>ถัดไป</button></div>
+      </section>
+      <div class="result-actions"><button id="playAgain" type="button">เล่นอีกครั้ง</button><button id="resultViewStats" type="button" class="secondary-button" data-view-stats hidden>ประวัติของฉัน</button><button id="closeResult" type="button" class="secondary-button">ปิดผลลัพธ์</button></div>
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="levels.js?v=20260908-photos1"></script>
-  <script src="account.js?v=20260910-stats1"></script>
-  <script src="app.js?v=20260910-stats1"></script>
+  <script src="account.js?v=20260911-sprint1"></script>
+  <script src="app.js?v=20260911-sprint1"></script>
 </body>
 </html>

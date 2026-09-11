@@ -232,7 +232,7 @@ test('real game client registers and completes all three stages against D1, incl
     f.tick(10000);
     if (i === 0) $('#playScene').click();
     for (const answer of levels[i].differences) $(`#playScene [data-id="${answer.id}"]`).click();
-    if (i < 2) { $('#playAgain').click(); await until(() => $('.pictures').dataset.state === 'playing'); }
+    if (i < 2) { assert.equal($('.pictures').dataset.state, 'transition'); await until(() => $('.pictures').dataset.state === 'playing'); }
   }
   await until(() => $('#saveScoreStatus').textContent.startsWith('บันทึกแล้ว'));
   assert.match($('#saveScoreStatus').textContent, /00:35.00/);
@@ -240,6 +240,9 @@ test('real game client registers and completes all three stages against D1, incl
   assert.match($('#leaderboardRows').textContent, /ผู้เล่น Cloudflare/);
   assert.equal($('#leaderboardRows').textContent.includes('0812345678'), false);
   assert.equal($('#personalBest').textContent, '00:35.00');
+  assert.equal($('#resultFound').textContent, '15 / 15');
+  await until(() => $('#resultRank').textContent === '#1');
+  assert.match($('#resultBoardRows .is-me').textContent, /ผู้เล่น Cloudflare \(คุณ\)/);
   assert.equal($('#resultViewStats').hidden, false);
   $('#resultViewStats').click();
   assert.equal($('#resultModal').hidden, true);
@@ -284,7 +287,7 @@ test('D1 public top ten keeps one best time per player and exports contacts only
   assert.equal(personal.bestScoreMs, 21000);
   assert.equal(personal.completedRuns, 2);
   assert.equal(personal.recentRuns.length, 2);
-  assert.deepEqual(Object.keys(personal.recentRuns[0]).sort(), ['completedAt', 'createdAt', 'level', 'misses', 'scoreMs', 'status']);
+  assert.deepEqual(Object.keys(personal.recentRuns[0]).sort(), ['completedAt', 'createdAt', 'foundCount', 'level', 'misses', 'rulesVersion', 'scoreMs', 'status']);
   assert.deepEqual((await admin.request('/api/me/stats?user_id=' + lastPlayer.id)).body,
     { completedRuns: 0, bestScoreMs: null, rank: null, recentRuns: [] });
   assert.equal((await lastPlayer.request('/api/me/stats', undefined, { Cookie: '' })).status, 401);
@@ -306,4 +309,67 @@ test('D1 data survives Worker and local runtime restarts', async () => {
     await runtime.dispose(); runtime = new Miniflare(options); db = await runtime.getD1Database('DB');
     assert.equal((await db.prepare('SELECT line_name FROM users WHERE id=?').bind('persisted').first()).line_name, 'ข้อมูลคงอยู่');
   } finally { await runtime?.dispose(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('90-second D1 rounds keep partial finds, reject pausing and acknowledge taps that arrive after expiry', async (t) => {
+  const f = await fixture(t);
+  const created = await f.request('/api/runs', { rulesVersion: 2 });
+  assert.equal(created.status, 201); assert.equal(created.body.levelMs, 90000);
+  const path = `/api/runs/${created.body.id}/events`;
+  let seq = 0;
+  const send = async (type, level, data = {}) => {
+    const event = { eventId: randomUUID(), seq: ++seq, type, level, ...data };
+    const response = await f.request(path, event); assert.equal(response.status, 200, JSON.stringify(response.body));
+    return { event, result: response.body };
+  };
+  await send('begin', 0); f.tick(10000);
+  await send('hit', 0, { answer: levels[0].differences[0].id });
+  await send('hit', 0, { answer: levels[0].differences[1].id });
+  await send('miss', 0);
+  for (const type of ['pause', 'timeout']) {
+    assert.equal((await f.request(path, { eventId: randomUUID(), seq: seq + 1, type, level: 0 })).status, 409);
+  }
+  f.tick(80000);
+  const expired = await send('hit', 0, { answer: levels[0].differences[2].id, scoreMs: 1 });
+  assert.equal(expired.result.phase, 'intermission'); assert.equal(expired.result.foundCount, 2);
+  await send('timeout', 0);
+  await send('begin', 1); f.tick(30000);
+  for (const answer of levels[1].differences) await send('hit', 1, { answer: answer.id });
+  await send('begin', 2); f.tick(90000);
+  const final = await send('timeout', 2);
+  assert.equal(final.result.status, 'complete'); assert.equal(final.result.foundCount, 7);
+  assert.equal(final.result.scoreMs, 215000); assert.equal(final.result.rank, 1);
+  assert.deepEqual(final.result.stages.map((s) => s.foundCount), [2, 5, 0]);
+  const late = await send('hit', 2, { answer: levels[2].differences[0].id });
+  assert.equal(late.result.foundCount, 7); assert.equal(late.result.scoreMs, 215000);
+  assert.deepEqual((await f.request(path, final.event)).body, final.result);
+  const personal = (await f.request('/api/me/stats?rulesVersion=2')).body;
+  assert.equal(personal.completedRuns, 1); assert.equal(personal.bestFoundCount, 7);
+  assert.equal(personal.recentRuns[0].rulesVersion, 2);
+  assert.deepEqual((await f.request('/api/leaderboard')).body.entries, []);
+});
+
+test('90-second rankings prioritize finds, paginate all players and keep the viewer rank on every page', async (t) => {
+  let viewer;
+  for (let i = 0; i < 12; i++) {
+    const f = await fixture(t); viewer = f;
+    await DB.prepare('UPDATE users SET name=? WHERE id=?').bind(`Sprint ${i}`, f.id).run();
+    for (const [found, score] of [[15 - i, 200000 + i], [14 - i, 1000]]) {
+      await DB.prepare("INSERT INTO runs(id,user_id,status,phase,found,score_ms,misses,created_at,completed_at) VALUES(?,?,'complete','finished',?,?,0,?,?)")
+        .bind(randomUUID(), f.id, JSON.stringify({ rulesVersion: 2, totalFound: found, found: [], stages: [] }), score, f.now(), f.now()).run();
+    }
+  }
+  const one = (await viewer.request('/api/leaderboard?rulesVersion=2')).body;
+  assert.equal(one.entries.length, 10); assert.equal(one.totalPlayers, 12); assert.equal(one.totalRuns, 24);
+  assert.equal(one.entries[0].foundCount, 15); assert.equal(one.entries[0].scoreMs, 200000);
+  assert.equal(one.me.rank, 12); assert.equal(one.me.foundCount, 4);
+  assert.equal(one.entries.some((r) => r.isMe), false);
+  const two = (await viewer.request('/api/leaderboard?rulesVersion=2&page=2')).body;
+  assert.equal(two.entries.length, 2); assert.equal(two.entries[1].rank, 12); assert.equal(two.entries[1].isMe, true);
+  assert.equal(two.me.rank, 12);
+  const own = (await viewer.request('/api/me/stats?rulesVersion=2')).body;
+  assert.equal(own.bestFoundCount, 4); assert.equal(own.bestScoreMs, 200011);
+  const anonymous = (await viewer.request('/api/leaderboard?rulesVersion=2&page=2', undefined, { Cookie: '' })).body;
+  assert.equal(anonymous.me, null); assert.equal(anonymous.entries.some((r) => r.isMe), false);
+  assert.deepEqual(Object.keys(anonymous.entries[0]).sort(), ['foundCount', 'isMe', 'misses', 'name', 'rank', 'scoreMs']);
 });

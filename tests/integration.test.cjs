@@ -30,7 +30,7 @@ test('the real client registers a player, plays three stages and shows the serve
   t.after(async () => { w.close(); await app.close(); rmSync(dataDir, { recursive: true, force: true }); });
   const $ = (s) => w.document.querySelector(s);
   const until = async (condition) => {
-    const deadline = Date.now() + 3000;
+    const deadline = Date.now() + 6000;
     while (!condition()) { if (Date.now() > deadline) throw new Error('Client did not reach the expected state'); await new Promise((done) => setTimeout(done, 10)); }
   };
   for (const file of ['levels.js', 'account.js', 'app.js']) w.eval(readFileSync(join(root, file), 'utf8'));
@@ -45,8 +45,8 @@ test('the real client registers a player, plays three stages and shows the serve
     clock += 10000;
     if (i === 0) $('#playScene').click();
     for (const point of levels[i].differences) $(`#playScene [data-id="${point.id}"]`).click();
-    assert.equal($('#resultModal').hidden, false);
-    if (i < 2) { $('#playAgain').click(); await until(() => $('.pictures').dataset.state === 'playing'); }
+    assert.equal($('#resultModal').hidden, i < 2);
+    if (i < 2) await until(() => $('.pictures').dataset.state === 'playing');
   }
   await until(() => $('#saveScoreStatus').textContent.startsWith('บันทึกแล้ว'));
   assert.match($('#saveScoreStatus').textContent, /00:35.00/);

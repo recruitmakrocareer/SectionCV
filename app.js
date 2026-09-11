@@ -8,7 +8,7 @@
   const originalImage = $('#originalImage');
   const comparisonImage = $('#comparisonImage');
   const differenceImage = $('#differenceImage');
-  const duration = 120_000;
+  const duration = 90_000;
   const timerEl = $('#timer');
   const hintButton = $('#hintButton');
   const startButton = $('#startButton');
@@ -19,6 +19,7 @@
   const account = window.MAKRO_ACCOUNT;
   const penaltyMs = 5000;
   const completedMisses = Array(levels.length).fill(0);
+  const completedFound = Array(levels.length).fill(0);
   let misses = 0;
   let starting = false;
   let campaignStarted = false;
@@ -41,15 +42,16 @@
   let remaining = duration;
   let deadline = 0;
   let timer;
+  let transitionTimer;
+  let transitionCountTimer;
   let toastTimer;
   let loadGeneration = 0;
-  let roundWon = false;
   let soundEnabled = false;
   let audioContext;
   const preloaded = new Map();
 
   const formatTime = (milliseconds) => {
-    const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+    const seconds = Math.max(0, Math.floor(milliseconds / 1000));
     return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   };
 
@@ -58,6 +60,7 @@
     return `${String(Math.floor(n / 6000)).padStart(2, '0')}:${String(Math.floor(n / 100) % 60).padStart(2, '0')}.${String(n % 100).padStart(2, '0')}`;
   };
   const totalMisses = () => completedMisses.reduce((sum, n) => sum + n, 0) + (completed[levelIndex] === null ? misses : 0);
+  const totalFound = () => completedFound.reduce((sum, n) => sum + n, 0) + (completed[levelIndex] === null ? found.size : 0);
   const score = () => confirmedScore ?? (completed.reduce((sum, n) => sum + (n || 0), 0) + (completed[levelIndex] === null ? duration - remaining : 0) + totalMisses() * penaltyMs);
   function syncBackground() {
     background.forEach((element) => { element.inert = !modal.hidden || !startModal.hidden; });
@@ -72,7 +75,7 @@
   function closeStart() { startModal.hidden = true; syncBackground(); }
   function record(type, data) {
     if (!ranked) return;
-    account.event(type, data).catch(() => {
+    account.event(type, { level: levelIndex, ...data }).catch(() => {
       showToast('การเชื่อมต่อสะดุด กำลังเก็บรายการที่รอส่งไว้ในรอบนี้');
     });
   }
@@ -88,6 +91,11 @@
       const result = await account.saveResult();
       if (generation !== resultGeneration) return;
       confirmedScore = result.scoreMs;
+      if (result.stages) result.stages.forEach((stage) => {
+        completed[stage.level] = stage.elapsedMs; completedFound[stage.level] = stage.foundCount; completedMisses[stage.level] = stage.misses;
+      });
+      renderResultMetrics(result.stages);
+      $('#resultRank').textContent = result.rank ? `#${result.rank}` : '—';
       $('#saveScoreStatus').textContent = `บันทึกแล้ว · เวลาจัดอันดับ ${formatScore(result.scoreMs)}${result.rank ? ` · อันดับที่ ${result.rank}` : ''}`;
       $('#scoreTime').textContent = formatScore(result.scoreMs);
     } catch (error) {
@@ -165,15 +173,20 @@
   });
 
   function nextActionLabel() {
-    if (!roundWon && ranked) return 'เริ่มใหม่ทั้ง 3 ด่าน';
-    if (!roundWon) return 'ลองด่านนี้อีกครั้ง';
-    return levelIndex < levels.length - 1 ? `ไปด่านที่ ${levelIndex + 2}` : 'เริ่มใหม่ทั้ง 3 ด่าน';
+    return 'เล่นใหม่ทั้ง 3 ด่าน';
   }
 
   function render() {
     $('#scoreTime').textContent = formatScore(score());
     $('#penaltySummary').textContent = `กดผิด ${totalMisses()} ครั้ง · +${totalMisses() * 5} วินาที`;
     timerEl.textContent = formatTime(remaining);
+    $('#timerTenths').textContent = `.${Math.floor(Math.max(0, remaining) % 1000 / 100)}`;
+    $('#countdownBar').style.transform = `scaleX(${Math.max(0, remaining / duration)})`;
+    $('#countdownHud').dataset.urgency = remaining <= 10000 ? 'critical' : remaining <= 30000 ? 'warning' : 'normal';
+    $('#countdownHud').dataset.running = String(phase === 'playing');
+    $('#countdownLabel').textContent = phase === 'transition' ? 'กำลังไปภาพถัดไป' : phase === 'playing' && remaining <= 10000 ? '10 วินาทีสุดท้าย!' : 'เวลาที่เหลือ';
+    $('#hudLevel').textContent = `ด่าน ${levelIndex + 1} / 3`;
+    $('#totalFoundLabel').textContent = `รวม ${totalFound()} / 15 จุด`;
     timerEl.classList.toggle('urgent', phase === 'playing' && Math.ceil(remaining / 1000) <= 10);
     $('#foundCount').textContent = found.size;
     const percent = Math.round(found.size / Math.max(1, ids.length) * 100);
@@ -184,23 +197,24 @@
     hintButton.disabled = phase !== 'playing' || hints === 0 || ids.every((id) => found.has(id) || hinted.has(id));
     startButton.textContent = {
       loading: 'กำลังโหลดภาพ…', error: 'ลองโหลดภาพอีกครั้ง', ready: `เริ่มด่านที่ ${levelIndex + 1}`,
-      playing: 'หยุดพัก', paused: 'เล่นต่อ', finished: nextActionLabel()
+      playing: 'กำลังเล่น', transition: 'กำลังไปด่านถัดไป…', finished: nextActionLabel()
     }[phase];
-    startButton.disabled = phase === 'loading' || starting || savingScore;
+    startButton.disabled = ['loading', 'playing', 'transition'].includes(phase) || starting || savingScore;
     startButton.hidden = ['loading', 'error'].includes(phase);
-    popupStartButton.disabled = starting || savingScore || phase === 'loading' || (account && !account.canPlay());
+    popupStartButton.disabled = starting || savingScore || ['loading', 'playing', 'transition'].includes(phase) || (account && !account.canPlay());
     popupStartButton.textContent = starting ? 'กำลังเตรียมเกม…' : phase === 'loading' ? 'กำลังโหลดภาพ…' : phase === 'error' ? 'ลองโหลดภาพอีกครั้ง' : phase === 'paused' ? 'เล่นต่อ' : phase === 'finished' ? nextActionLabel() : account?.state.lineReady ? `เริ่มเกม · ด่านที่ ${levelIndex + 1}` : `เริ่มเกมฝึกซ้อม · ด่านที่ ${levelIndex + 1}`;
-    restartButton.textContent = ranked ? 'เริ่มใหม่ทั้ง 3 ด่าน' : 'เริ่มด่านนี้ใหม่';
-    restartButton.disabled = starting || savingScore || ['loading', 'error', 'ready'].includes(phase);
+    restartButton.textContent = 'เริ่มใหม่ทั้ง 3 ด่าน';
+    restartButton.disabled = starting || savingScore || ['loading', 'error', 'ready', 'transition'].includes(phase);
+    $('#accountButton').disabled = starting || ['playing', 'transition'].includes(phase);
     $('#playAgain').disabled = starting || savingScore;
     $('#startViewStats').disabled = starting;
     const status = {
       loading: `กำลังเตรียมภาพด่านที่ ${levelIndex + 1}…`,
       error: 'โหลดภาพไม่สำเร็จ ตรวจการเชื่อมต่อแล้วแตะลองโหลดภาพอีกครั้ง',
-      ready: `ด่านที่ ${levelIndex + 1} / ${levels.length} · พร้อมแล้วแตะเริ่มด่าน · 5 จุดใน 2 นาที`,
+      ready: `ด่านที่ ${levelIndex + 1} / ${levels.length} · 5 จุดใน 1 นาที 30 วินาที`,
       playing: 'กดผิด +5 วินาทีในเวลาจัดอันดับ · คำใบ้ 2 ครั้งต่อด่าน',
-      paused: 'หยุดพักแล้ว · แตะเล่นต่อเมื่อพร้อม',
-      finished: roundWon ? (levelIndex === levels.length - 1 ? 'ผ่านครบทั้ง 3 ด่านแล้ว!' : `ผ่านด่านที่ ${levelIndex + 1} แล้ว · ไปต่อด่านถัดไปได้เลย`) : 'หมดเวลาแล้ว · ลองด่านนี้ใหม่ได้เลย'
+      transition: 'จบด่านแล้ว · กำลังไปภาพถัดไปอัตโนมัติ',
+      finished: 'จบทั้ง 3 ภาพแล้ว! ดูผลงานและอันดับของคุณได้เลย'
     }[phase];
     if ($('#gameStatus').textContent !== status) $('#gameStatus').textContent = status;
     pictures.dataset.state = phase;
@@ -212,14 +226,14 @@
       item.classList.toggle('completed', completed[index] !== null);
       if (index === levelIndex) item.setAttribute('aria-current', 'step');
       else item.removeAttribute('aria-current');
-      item.querySelector('b').textContent = completed[index] !== null ? '✓' : index + 1;
+      item.querySelector('b').textContent = completed[index] !== null ? `${completedFound[index]}/5` : index + 1;
     });
     hotspots.forEach((spot) => {
       const matched = found.has(spot.dataset.id);
       spot.disabled = phase !== 'playing' || matched;
       spot.classList.toggle('found', matched);
       spot.classList.toggle('hint', phase === 'playing' && hinted.has(spot.dataset.id) && !matched);
-      spot.classList.toggle('revealed', phase === 'finished' && !matched);
+      spot.classList.toggle('revealed', ['transition', 'finished'].includes(phase) && !matched);
       spot.setAttribute('aria-pressed', String(matched));
       spot.setAttribute('aria-label', `${spot.dataset.label}${matched ? ' พบแล้ว' : ''}`);
     });
@@ -231,33 +245,56 @@
     if (!startButton.disabled) startButton.focus();
   }
 
+  function renderResultMetrics(stages) {
+    $('#resultTitle').textContent = totalFound() === 15 ? 'สุดยอด! เจอครบทั้ง 15 จุด' : 'จบชาเลนจ์ทั้ง 3 ด่านแล้ว!';
+    $('#resultFound').textContent = `${totalFound()} / 15`;
+    $('#resultTime').textContent = formatScore(score());
+    $('#resultMisses').textContent = `${totalMisses()} ครั้ง`;
+    $('#resultMessage').textContent = `เวลาที่ใช้ ${formatScore(completed.reduce((sum, elapsed) => sum + (elapsed || 0), 0))} + โทษกดผิด ${totalMisses() * 5} วินาที`;
+    $('#resultStages').replaceChildren();
+    levels.forEach((entry, index) => {
+      const item = document.createElement('li');
+      const title = document.createElement('span'); title.textContent = `ด่าน ${index + 1} · ${entry.shortTitle}`;
+      const value = document.createElement('strong'); value.textContent = `${completedFound[index]} / 5 จุด`;
+      const detail = document.createElement('small');
+      detail.textContent = `${formatScore(completed[index] || 0)} · ${(stages?.[index]?.timedOut ?? completedFound[index] < 5) ? 'หมดเวลา' : 'พบครบ'}`;
+      item.append(title, value, detail); $('#resultStages').appendChild(item);
+    });
+  }
+
   function endGame(won) {
     if (phase !== 'playing') return;
-    phase = 'finished';
-    roundWon = won;
     clearInterval(timer);
-    if (won) { completed[levelIndex] = duration - remaining; completedMisses[levelIndex] = misses; }
-    else record('timeout');
-    const finishedAll = completed.every((elapsed) => elapsed !== null);
-    render();
-    $('#resultIcon').textContent = won ? '🏆' : '⏰';
-    $('#resultLabel').textContent = finishedAll ? 'สำเร็จทั้ง 3 ด่าน' : won ? `ผ่านด่านที่ ${levelIndex + 1}` : 'หมดเวลา';
-    $('#resultTitle').textContent = finishedAll ? 'สุดยอด! พบครบทั้ง 15 จุด' : won ? 'เก่งมาก! เจอครบ 5 จุดแล้ว' : 'ลองอีกครั้งนะ!';
-    $('#resultMessage').textContent = finishedAll
-      ? `เวลาจริง ${formatScore(completed.reduce((sum, elapsed) => sum + elapsed, 0))} + เวลาปรับ ${totalMisses() * 5} วินาที = ${formatScore(score())}`
-      : won
-        ? `เหลือเวลา ${formatTime(remaining)} · ด่านถัดไป: ${levels[levelIndex + 1].title}`
-        : `พบ ${found.size} จาก ${ids.length} จุด วงสีเหลืองแสดงจุดที่เหลือ ลองด่านนี้อีกครั้งได้โดยไม่ต้องกลับไปด่านแรก`;
+    completed[levelIndex] = won ? duration - remaining : duration;
+    completedMisses[levelIndex] = misses;
+    completedFound[levelIndex] = found.size;
+    if (!won) { remaining = 0; record('timeout'); }
+    if (levelIndex < levels.length - 1) {
+      phase = 'transition';
+      $('#stageTransitionIcon').textContent = won ? '✓' : '⏱';
+      $('#stageTransitionTitle').textContent = won ? 'พบครบแล้ว!' : 'หมดเวลา!';
+      $('#stageTransitionText').textContent = `พบ ${found.size} / 5 จุด · ต่อไป: ${levels[levelIndex + 1].title}`;
+      $('#stageTransitionCount').textContent = '2';
+      $('#stageTransition').hidden = false;
+      render();
+      transitionCountTimer = setTimeout(() => { $('#stageTransitionCount').textContent = '1'; }, 1000);
+      transitionTimer = setTimeout(() => loadLevel(levelIndex + 1, true), 2000);
+      playSound(won ? 'win' : 'lose');
+      return;
+    }
+    phase = 'finished'; render();
+    $('#resultIcon').textContent = totalFound() === 15 ? '🏆' : '🎯';
+    $('#resultLabel').textContent = '90 SECOND CHALLENGE · ผลของคุณ';
+    renderResultMetrics();
     $('#playAgain').textContent = nextActionLabel();
-    modal.hidden = false;
-    startModal.hidden = true;
-    syncBackground();
-    $('#saveScoreStatus').textContent = !won && ranked ? 'รอบนี้ไม่บันทึกอันดับ เริ่มใหม่ทั้ง 3 ด่านเพื่อส่งสถิติ' : '';
-    $('#retryScore').hidden = true;
-    $('#resultViewStats').hidden = !finishedAll || !ranked;
-    if (finishedAll) saveScore();
-    (finishedAll && ranked ? $('#resultViewStats') : $('#playAgain')).focus();
-    playSound(won ? 'win' : 'lose');
+    modal.hidden = false; startModal.hidden = true; syncBackground();
+    $('#resultViewStats').hidden = !ranked;
+    $('#resultRank').textContent = '—';
+    $('#resultRankNote').textContent = ranked ? 'กำลังบันทึกผลและอัปเดตอันดับ…' : 'โหมดฝึกซ้อม · ไม่บันทึกอันดับ';
+    saveScore();
+    if (!ranked) account?.refreshLeaderboard(1);
+    (ranked ? $('#resultViewStats') : $('#playAgain')).focus();
+    playSound(totalFound() === 15 ? 'win' : 'found');
   }
 
   function syncTime() {
@@ -270,18 +307,20 @@
 
   function startGame() {
     if (starting) return;
-    if (phase !== 'ready' && phase !== 'paused') return;
-    const resuming = phase === 'paused';
+    if (phase !== 'ready') return;
     if (!account) { campaignStarted = true; return activateGame(); }
     if (!account.canPlay()) return openStart();
     starting = true;
     render();
     (async () => {
       if (!campaignStarted) { ranked = await account.startRun(); campaignStarted = true; }
-      if (ranked) await account.event(resuming ? 'resume' : 'begin', { level: levelIndex });
+      if (ranked) {
+        const sentAt = performance.now();
+        const result = await account.event('begin', { level: levelIndex });
+        if (result?.remainingMs !== undefined) remaining = Math.max(0, Math.min(remaining, result.remainingMs) - (performance.now() - sentAt));
+      }
       starting = false;
       activateGame();
-      if (document.hidden) pauseGame();
     })().catch((error) => {
       starting = false;
       $('#profileStatus').textContent = error.message;
@@ -294,9 +333,9 @@
     phase = 'playing';
     deadline = performance.now() + remaining;
     clearInterval(timer);
-    timer = setInterval(syncTime, 250);
+    timer = setInterval(syncTime, 100);
     render();
-    startButton.focus();
+    $('#countdownHud').scrollIntoView?.({ behavior: 'smooth', block: 'start' });
     if (soundEnabled) audioContext.resume().catch(() => {});
     // Fetch the next scene only after play starts; current photos take priority.
     const next = levels[levelIndex + 1];
@@ -308,38 +347,21 @@
     });
   }
 
-  function pauseGame() {
-    if (!syncTime()) return;
-    phase = 'paused';
-    clearInterval(timer);
-    record('pause');
-    render();
-  }
-
   function clearRound() {
     clearInterval(timer);
+    clearTimeout(transitionTimer); clearTimeout(transitionCountTimer);
+    $('#stageTransition').hidden = true;
     clearTimeout(toastTimer);
     missTimers.forEach((timeout) => clearTimeout(timeout));
     missTimers.clear();
-    document.querySelectorAll('.miss').forEach((miss) => miss.remove());
+    document.querySelectorAll('.miss, .tap-feedback').forEach((effect) => effect.remove());
+    [originalScene, playScene].forEach((scene) => scene.classList.remove('tap-wrong'));
     $('#toast').classList.remove('show');
     found = new Set();
     hinted = new Set();
     hints = 2;
     misses = 0;
     remaining = duration;
-    roundWon = false;
-  }
-
-  function resetRound() {
-    if (phase === 'loading' || phase === 'error') return;
-    clearRound();
-    completed[levelIndex] = null;
-    completedMisses[levelIndex] = 0;
-    phase = 'ready';
-    render();
-    closeResult();
-    openStart();
   }
 
   function waitForImage(image, src) {
@@ -376,6 +398,7 @@
           event.stopPropagation();
           if (!syncTime() || found.has(spot.dataset.id)) return;
           found.add(spot.dataset.id);
+          showTapFeedback(scene, difference.x, difference.y, '+1 จุด', 'correct');
           record('hit', { answer: spot.dataset.id });
           render();
           if (found.size === ids.length) return endGame(true);
@@ -422,7 +445,7 @@
       }
       phase = 'ready';
       render();
-      if (autoStart && !document.hidden) startGame();
+      if (autoStart) startGame();
       else openStart();
     }).catch(() => {
       if (generation !== loadGeneration) return;
@@ -435,13 +458,7 @@
   function proceed() {
     if (starting || savingScore) return;
     if (phase !== 'finished') return;
-    if (ranked && !roundWon) return resetCampaign();
-    if (roundWon && levelIndex < levels.length - 1) return loadLevel(levelIndex + 1, true);
-    if (roundWon) {
-      return resetCampaign(true);
-    }
-    resetRound();
-    startGame();
+    return resetCampaign(true);
   }
 
   function resetCampaign(autoStart = false) {
@@ -449,13 +466,13 @@
     confirmedScore = null;
     completed.fill(null);
     completedMisses.fill(0);
+    completedFound.fill(0);
     campaignStarted = false;
     return loadLevel(0, autoStart);
   }
 
   startButton.addEventListener('click', () => {
     if (phase === 'error') return loadLevel(levelIndex);
-    if (phase === 'playing') return pauseGame();
     if (phase === 'finished') return proceed();
     startGame();
   });
@@ -466,17 +483,17 @@
   });
   window.addEventListener('account:change', render);
   $('#accountButton').addEventListener('click', () => {
-    if (phase === 'playing') pauseGame();
+    if (starting || ['playing', 'transition'].includes(phase)) return;
     openStart();
   });
   $('#retryScore').addEventListener('click', saveScore);
-  restartButton.addEventListener('click', () => ranked ? resetCampaign() : resetRound());
+  restartButton.addEventListener('click', () => resetCampaign());
   $('#playAgain').addEventListener('click', proceed);
   $('#closeResult').addEventListener('click', closeResult);
   document.querySelectorAll('[data-view-stats]').forEach((button) => button.addEventListener('click', (event) => {
     event.preventDefault();
     if (starting) return;
-    if (phase === 'playing') pauseGame();
+    if (phase === 'playing') showToast('เวลายังคงนับถอยหลังระหว่างดูสถิติ');
     modal.hidden = true;
     closeStart();
     account?.refreshPersonalStats();
@@ -485,6 +502,19 @@
     stats.focus({ preventScroll: true });
   }));
 
+  function showTapFeedback(scene, x, y, label, kind) {
+    const effect = document.createElement('span');
+    effect.className = `tap-feedback ${kind}`; effect.textContent = label; effect.setAttribute('aria-hidden', 'true');
+    effect.style.left = `${Math.max(8, Math.min(92, x))}%`;
+    effect.style.top = `${Math.max(15, Math.min(90, y))}%`;
+    scene.appendChild(effect);
+    if (kind === 'wrong') {
+      scene.classList.remove('tap-wrong'); void scene.offsetWidth; scene.classList.add('tap-wrong');
+    }
+    const timeout = setTimeout(() => { effect.remove(); scene.classList.remove('tap-wrong'); missTimers.delete(timeout); }, 800);
+    missTimers.add(timeout);
+  }
+
   [originalScene, playScene].forEach((scene) => scene.addEventListener('click', (event) => {
     if (event.target.closest('.hotspot') || !syncTime()) return;
     misses += 1;
@@ -492,6 +522,8 @@
     render();
     showToast('กดผิด +5 วินาทีในเวลาจัดอันดับ');
     const rect = scene.getBoundingClientRect();
+    showTapFeedback(scene, rect.width ? (event.clientX - rect.left) / rect.width * 100 : 50,
+      rect.height ? (event.clientY - rect.top) / rect.height * 100 : 50, '+5 วินาทีปรับ', 'wrong');
     const miss = document.createElement('span');
     miss.className = 'miss';
     miss.setAttribute('aria-hidden', 'true');
@@ -515,10 +547,11 @@
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && phase === 'playing') pauseGame();
+    // The deadline keeps running even when this tab is in the background.
+    if (phase === 'playing') syncTime();
   });
   window.addEventListener('pagehide', () => {
-    if (phase === 'playing') pauseGame();
+    if (phase === 'playing') syncTime();
   });
   modal.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') { event.preventDefault(); closeResult(); }

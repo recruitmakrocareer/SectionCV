@@ -6,8 +6,8 @@ const { mkdirSync, readFileSync, chmodSync, existsSync } = require('node:fs');
 const { resolve, extname } = require('node:path');
 const levels = require('../levels.js');
 
-const { advanceRun, PENALTY_MS, LEVEL_MS, fail } = require('./game-rules.cjs');
-const { boardSQL, rankSQL, summarySQL, historySQL } = require('./statistics.cjs');
+const { advanceRun, runResult, newProgress, sprintProgress, PENALTY_MS, LEVEL_MS, SPRINT_MS, fail } = require('./game-rules.cjs');
+const { boardSQL, rankSQL, summarySQL, historySQL, board90SQL, rank90SQL, me90SQL, totals90SQL, summary90SQL, boardPage, board90View } = require('./statistics.cjs');
 const SESSION_MS = 7 * 86400000;
 const random = () => randomBytes(32).toString('base64url');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
@@ -108,8 +108,8 @@ function createApp(options = {}) {
     } catch { fail('ข้อมูลไม่ถูกต้อง'); }
   }
   function leaderboard() { return db.prepare(`${boardSQL} LIMIT 10`).all().map((r) => ({ name: r.name, scoreMs: r.score_ms, misses: r.misses })); }
-  function rankFor(userId) {
-    const row = db.prepare(rankSQL).get(userId);
+  function rankFor(userId, sprint = false) {
+    const row = db.prepare(sprint ? rank90SQL : rankSQL).get(userId);
     return row?.rank || null;
   }
   async function linePost(path, values) {
@@ -135,8 +135,8 @@ function createApp(options = {}) {
       advanceRun(run, event, now());
       db.prepare(`UPDATE runs SET status=?,level=?,phase=?,found=?,elapsed_ms=?,current_ms=?,misses=?,hints=?,segment_at=?,last_seq=?,completed_at=?,score_ms=? WHERE id=?`)
         .run(run.status, run.level, run.phase, run.found, run.elapsed_ms, run.current_ms, run.misses, run.hints, run.segment_at, run.last_seq, run.completed_at, run.score_ms, id);
-      const response = { status: run.status, level: run.level, phase: run.phase, scoreMs: run.score_ms, misses: run.misses,
-        rank: run.status === 'complete' ? rankFor(user.id) : null };
+      const response = runResult(run, now());
+      response.rank = run.status === 'complete' ? rankFor(user.id, !!sprintProgress(run)) : null;
       db.prepare('INSERT INTO events(run_id,event_id,seq,payload_hash,response) VALUES(?,?,?,?,?)').run(id, event.eventId, event.seq, digest, JSON.stringify(response));
       db.exec('COMMIT'); return response;
     } catch (error) { db.exec('ROLLBACK'); throw error; }
@@ -190,9 +190,21 @@ function createApp(options = {}) {
         const user = session(req, false);
         return json(res, 200, { lineReady, csrf: user?.csrf || '', user: user ? userView(user) : null, penaltyMs: PENALTY_MS });
       }
-      if (req.method === 'GET' && url.pathname === '/api/leaderboard') return json(res, 200, { entries: leaderboard() });
+      if (req.method === 'GET' && url.pathname === '/api/leaderboard') {
+        if (url.searchParams.get('rulesVersion') === '2') {
+          const user = session(req, false), page = boardPage(url);
+          return json(res, 200, board90View(db.prepare(`${board90SQL} LIMIT 10 OFFSET ?`).all((page - 1) * 10),
+            db.prepare(totals90SQL).get(), db.prepare(me90SQL).get(user?.id || ''), user?.id, page));
+        }
+        return json(res, 200, { entries: leaderboard() });
+      }
       if (req.method === 'GET' && url.pathname === '/api/me/stats') {
         const user = session(req);
+        if (url.searchParams.get('rulesVersion') === '2') {
+          const me = db.prepare(me90SQL).get(user.id);
+          return json(res, 200, { ...db.prepare(summary90SQL).get(user.id), bestScoreMs: me?.scoreMs ?? null,
+            bestFoundCount: me?.foundCount ?? null, rank: me?.rank ?? null, recentRuns: db.prepare(historySQL).all(user.id) });
+        }
         return json(res, 200, { ...db.prepare(summarySQL).get(user.id), rank: rankFor(user.id),
           recentRuns: db.prepare(historySQL).all(user.id) });
       }
@@ -228,15 +240,16 @@ function createApp(options = {}) {
         }
         if (url.pathname === '/api/runs') {
           if (!userView(user).profileComplete) fail('กรุณาบันทึกชื่อ เบอร์ติดต่อ และการยินยอมก่อนเริ่มเกม', 403);
+          if (data.rulesVersion !== undefined && data.rulesVersion !== 2) fail('กรุณาโหลดเกมเวอร์ชันล่าสุด', 409);
           if (db.prepare('SELECT COUNT(*) AS n FROM runs WHERE user_id=? AND created_at>?').get(user.id, now() - 60000).n >= 10) fail('เริ่มเกมบ่อยเกินไป กรุณารอสักครู่', 429);
           const id = randomUUID();
           db.exec('BEGIN IMMEDIATE');
           try {
             db.prepare("UPDATE runs SET status='abandoned' WHERE user_id=? AND status='active'").run(user.id);
-            db.prepare('INSERT INTO runs(id,user_id,created_at) VALUES(?,?,?)').run(id, user.id, now());
+            db.prepare('INSERT INTO runs(id,user_id,created_at,found) VALUES(?,?,?,?)').run(id, user.id, now(), newProgress(data.rulesVersion));
             db.exec('COMMIT');
           } catch (error) { db.exec('ROLLBACK'); throw error; }
-          return json(res, 201, { id, penaltyMs: PENALTY_MS });
+          return json(res, 201, { id, penaltyMs: PENALTY_MS, rulesVersion: data.rulesVersion || 1, levelMs: data.rulesVersion === 2 ? SPRINT_MS : LEVEL_MS });
         }
         const match = url.pathname.match(/^\/api\/runs\/([\w-]{36})\/events$/);
         if (match) return json(res, 200, applyEvent(user, match[1], data));

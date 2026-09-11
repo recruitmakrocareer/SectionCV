@@ -1,8 +1,8 @@
 import rules from '../server/game-rules.cjs';
 import statistics from '../server/statistics.cjs';
 
-const { advanceRun, PENALTY_MS, fail } = rules;
-const { boardSQL, rankSQL, summarySQL, historySQL } = statistics;
+const { advanceRun, runResult, newProgress, sprintProgress, PENALTY_MS, SPRINT_MS, fail } = rules;
+const { boardSQL, rankSQL, summarySQL, historySQL, board90SQL, rank90SQL, me90SQL, totals90SQL, summary90SQL, boardPage, board90View } = statistics;
 const SESSION_MS = 7 * 86400000;
 const encoder = new TextEncoder();
 const random = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
@@ -172,11 +172,25 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           return json({ lineReady, csrf: user?.csrf || '', user: user ? userView(user) : null, penaltyMs: PENALTY_MS });
         }
         if (request.method === 'GET' && url.pathname === '/api/leaderboard') {
+          if (url.searchParams.get('rulesVersion') === '2') {
+            const user = await session(false), page = boardPage(url);
+            const [rows, totals, me] = await db.batch([
+              stmt(`${board90SQL} LIMIT 10 OFFSET ?`, (page - 1) * 10), stmt(totals90SQL), stmt(me90SQL, user?.id || '')
+            ]);
+            return json(board90View(rows.results, totals.results[0], me.results[0], user?.id, page));
+          }
           const { results } = await stmt(`${boardSQL} LIMIT 10`).all();
           return json({ entries: results.map((row) => ({ name: row.name, scoreMs: row.score_ms, misses: row.misses })) });
         }
         if (request.method === 'GET' && url.pathname === '/api/me/stats') {
           const user = await session();
+          if (url.searchParams.get('rulesVersion') === '2') {
+            const [summary, me, history] = await db.batch([
+              stmt(summary90SQL, user.id), stmt(me90SQL, user.id), stmt(historySQL, user.id)
+            ]);
+            return json({ ...summary.results[0], bestScoreMs: me.results[0]?.scoreMs ?? null,
+              bestFoundCount: me.results[0]?.foundCount ?? null, rank: me.results[0]?.rank ?? null, recentRuns: history.results });
+          }
           const [summary, rank, history] = await db.batch([
             stmt(summarySQL, user.id), stmt(rankSQL, user.id), stmt(historySQL, user.id)
           ]);
@@ -216,14 +230,15 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           }
           if (url.pathname === '/api/runs') {
             if (!userView(user).profileComplete) fail('กรุณาบันทึกชื่อ เบอร์ติดต่อ และการยินยอมก่อนเริ่มเกม', 403);
+            if (data.rulesVersion !== undefined && data.rulesVersion !== 2) fail('กรุณาโหลดเกมเวอร์ชันล่าสุด', 409);
             const id = crypto.randomUUID(), timestamp = now();
             const belowLimit = '(SELECT COUNT(*) FROM runs WHERE user_id=? AND created_at>?)<10';
             const result = await db.batch([
               stmt(`UPDATE runs SET status='abandoned' WHERE user_id=? AND status='active' AND ${belowLimit}`, user.id, user.id, timestamp - 60000),
-              stmt(`INSERT INTO runs(id,user_id,created_at) SELECT ?,?,? WHERE ${belowLimit}`, id, user.id, timestamp, user.id, timestamp - 60000)
+              stmt(`INSERT INTO runs(id,user_id,created_at,found) SELECT ?,?,?,? WHERE ${belowLimit}`, id, user.id, timestamp, newProgress(data.rulesVersion), user.id, timestamp - 60000)
             ]);
             if (result[1].meta.changes !== 1) fail('เริ่มเกมบ่อยเกินไป กรุณารอสักครู่', 429);
-            return json({ id, penaltyMs: PENALTY_MS }, 201);
+            return json({ id, penaltyMs: PENALTY_MS, rulesVersion: data.rulesVersion || 1, levelMs: data.rulesVersion === 2 ? SPRINT_MS : 120000 }, 201);
           }
           const match = url.pathname.match(/^\/api\/runs\/([\w-]{36})\/events$/);
           if (match) return json(await applyEvent(db, user, match[1], data, now()));
@@ -255,18 +270,20 @@ async function applyEvent(db, user, id, event, timestamp) {
   };
   if (snapshot[1].results[0]) return replay(snapshot[1].results[0]);
   const previousSeq = run.last_seq;
+  const previousStatus = run.status;
   advanceRun(run, event, timestamp);
-  const response = { status: run.status, level: run.level, phase: run.phase, scoreMs: run.score_ms, misses: run.misses, rank: null };
+  const response = runResult(run, timestamp);
+  const ranking = sprintProgress(run) ? rank90SQL : rankSQL;
   const revision = crypto.randomUUID();
   // Optimistic compare-and-swap plus event insertion form ONE D1 transaction.
   // The private revision token guards INSERT even when UPDATE loses a race to
   // another event or a newly started game. No read/await gap inside the batch.
-  const responseSQL = run.status === 'complete' ? `json_set(?, '$.rank', (${rankSQL}))` : '?';
+  const responseSQL = run.status === 'complete' ? `json_set(?, '$.rank', (${ranking}))` : '?';
   const responseValues = run.status === 'complete' ? [JSON.stringify(response), user.id] : [JSON.stringify(response)];
   const result = await db.batch([
     stmt(`UPDATE runs SET status=?,level=?,phase=?,found=?,elapsed_ms=?,current_ms=?,misses=?,hints=?,segment_at=?,last_seq=?,completed_at=?,score_ms=?,revision_token=?
-      WHERE id=? AND user_id=? AND status='active' AND last_seq=?`, run.status, run.level, run.phase, run.found, run.elapsed_ms, run.current_ms,
-      run.misses, run.hints, run.segment_at, run.last_seq, run.completed_at, run.score_ms, revision, id, user.id, previousSeq),
+      WHERE id=? AND user_id=? AND status=? AND last_seq=?`, run.status, run.level, run.phase, run.found, run.elapsed_ms, run.current_ms,
+      run.misses, run.hints, run.segment_at, run.last_seq, run.completed_at, run.score_ms, revision, id, user.id, previousStatus, previousSeq),
     stmt(`INSERT INTO events(run_id,event_id,seq,payload_hash,response)
       SELECT ?,?,?,?,${responseSQL} FROM runs WHERE id=? AND revision_token=?`, id, event.eventId, event.seq, payloadHash, ...responseValues, id, revision),
     stmt('SELECT payload_hash,response FROM events WHERE run_id=? AND event_id=?', id, event.eventId)
