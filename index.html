@@ -4,17 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="เกมจับผิดภาพเสมือนจริง 3 ด่านในแม็คโคร ด่านละ 5 จุด เล่นบนมือถือได้">
-  <title>MAKRO — จับผิดภาพเสมือนจริง 3 ด่าน</title>
+  <title>MAKRO — เลือกเกมที่อยากเล่น</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260912-liff1">
+  <link rel="stylesheet" href="styles.css?v=20260912-games1">
 </head>
-<body>
-  <header class="site-header">
-    <a class="logo" href="#" aria-label="Makro home">makro<span>.</span></a>
+<body class="choosing-game">
+  <section id="gameLobby" class="game-lobby" aria-labelledby="lobbyTitle">
+  <a class="lobby-brand" href="./">makro<span>.</span></a>
+  <p class="lobby-eyebrow">MAKRO PLAY TIME</p>
+  <h1 id="lobbyTitle">พักสักนิด<br>มา<span>เล่นกัน!</span></h1>
+  <p class="lobby-intro">เลือกเกมที่ชอบ แล้วท้าทายสถิติของตัวเอง</p>
+  <div class="game-options">
+    <article class="game-option"><div class="game-art difference-art" aria-hidden="true"><span>🔎</span><b>จับให้ไว ก่อนหมดเวลา</b></div><div class="game-option-copy"><small>ช่างสังเกต ต้องลอง</small><h2>เกมจับผิดภาพ</h2><p>สำรวจภาพในแม็คโคร หาจุดต่างให้ครบ<br>3 ด่าน · ภาพละ 90 วินาที</p><button id="chooseDifference" class="game-launch" type="button">เล่นเกมจับผิดภาพ →</button></div></article>
+    <article class="game-option"><div class="game-art memory-art" aria-hidden="true"><span>🍎 🥛<br>🥛 🍎</span><b>จำให้แม่น จับให้ครบ</b></div><div class="game-option-copy"><small>ทดสอบความจำ สนุกทุกวัย</small><h2>เกมจับคู่</h2><p>พลิกการ์ดภาพสินค้าน่ารัก หาคู่ที่เหมือนกัน<br>16 ใบ · 8 คู่ · สถิติในเครื่อง</p><a class="game-launch" href="memory-game/">เล่นเกมจับคู่ →</a></div></article>
+  </div>
+  <p class="lobby-footer">เลือกเล่นได้ทั้ง 2 เกม บนมือถือและคอมพิวเตอร์</p>
+</section>
+<header class="site-header">
+    <a class="logo" href="./" aria-label="เลือกเกม">makro<span>.</span></a>
     <nav aria-label="เมนูหลัก">
-      <a class="active" href="#game">หน้าแรก</a>
+      <a class="active" href="./">เลือกเกม</a>
       <a href="#howto">วิธีเล่น</a>
       <a href="#leaderboard">อันดับผู้เล่น</a>
       <a href="#personalStats" data-view-stats>สถิติของฉัน</a>
@@ -140,5 +151,6 @@
   <script src="liff.js?v=20260912-liff1"></script>
   <script src="account.js?v=20260912-liff1"></script>
   <script src="app.js?v=20260912-liff1"></script>
+<script src="lobby.js?v=20260912-games1"></script>
 </body>
 </html>

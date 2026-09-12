@@ -314,3 +314,21 @@ footer small { font-size: 12px; }
 
 .zoom-tip { display: none; }
 @media (max-width: 800px) { .zoom-tip { display: block; font-size: 12px; margin-top: 2px; } }
+
+/* Game selection is visible before the game or registration dialog. */
+body.choosing-game{overflow:auto!important}
+body.choosing-game > :not(#gameLobby):not(script){display:none!important}
+.game-lobby{display:none;max-width:1080px;margin:auto;padding:28px 24px 48px}
+.choosing-game .game-lobby{display:block}
+.lobby-brand{font-style:italic;font-weight:800;font-size:38px;color:#d71920;text-decoration:none}.lobby-brand span{color:#ffbe23}
+.lobby-eyebrow{margin:44px 0 10px;letter-spacing:3px;font-weight:700;color:#d71920}
+.game-lobby h1{font-size:clamp(42px,7vw,72px);line-height:1.13;margin:0}.game-lobby h1 span{color:#d71920}
+.lobby-intro{font-size:19px;color:#65616a;margin:20px 0 30px}
+.game-options{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.game-option{background:#fff;border:1px solid #eadfda;border-radius:26px;overflow:hidden;box-shadow:0 12px 28px #53220c0a}
+.game-art{height:210px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}.game-art span{font-size:64px;line-height:1.1}.game-art b{font-size:17px}
+.difference-art{background:linear-gradient(130deg,#ffe5ce,#fff3cd);color:#8d4120}.memory-art{background:linear-gradient(130deg,#ddf5ec,#dff0ff);color:#235c63}.memory-art span{font-size:45px;letter-spacing:18px}
+.game-option-copy{padding:24px}.game-option-copy small{color:#a44338}.game-option-copy h2{margin:5px 0;font-size:28px}.game-option-copy p{color:#6b6464;line-height:1.8;margin:10px 0 22px}
+.game-launch{display:block;text-align:center;width:100%;border:0;border-radius:14px;background:#d71920;color:white;text-decoration:none;font:inherit;font-weight:600;padding:16px;cursor:pointer}.game-launch:hover{background:#b9101b}.game-launch:focus-visible{outline:3px solid #225dbc;outline-offset:4px}
+.lobby-footer{text-align:center;margin-top:30px;color:#726a68}
+@media(max-width:600px){.game-options{grid-template-columns:1fr}.game-lobby{padding:20px 18px 36px}.lobby-eyebrow{margin-top:28px}.game-art{height:165px}}

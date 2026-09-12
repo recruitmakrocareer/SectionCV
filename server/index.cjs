@@ -65,7 +65,7 @@ function createApp(options = {}) {
   `);
   const root = resolve(__dirname, '..');
   const publicFiles = new Set(['index.html', 'app.js', 'account.js', 'liff.js', 'levels.js', 'styles.css', 'admin.html', 'admin.js',
-    'memory-game/index.html', 'docs/memory-game/index.html', ...levels.flatMap((l) => [l.original, l.edited])]);
+    'lobby.js', 'memory-game/game.js', 'memory-game/index.html', 'docs/memory-game/index.html', ...levels.flatMap((l) => [l.original, l.edited])]);
   const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.webp': 'image/webp' };
   const callback = `${origin}/auth/line/callback`;
   const cookie = (name, value, age) => `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${age}; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
