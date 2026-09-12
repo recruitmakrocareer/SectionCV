@@ -51,7 +51,7 @@ function securityHeaders(response, secure) {
   headers.set('Cache-Control', 'no-store');
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Referrer-Policy', 'no-referrer');
-  headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+  headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' https://static.line-scdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.line.me https://access.line.me https://liff.line.me; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
   if (secure) headers.set('Strict-Transport-Security', 'max-age=31536000');
   return new Response(response.body, { status: response.status, headers });
 }
@@ -168,9 +168,39 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
             return redirect('/', [cookie('mk_session', token, SESSION_MS / 1000), cookie('mk_oauth', '', 0)]);
           } catch { return redirect('/?login_error=1', [cookie('mk_oauth', '', 0)]); }
         }
+        if (url.pathname === '/api/liff/config' && request.method === 'GET') {
+          if (!lineReady || !env.LIFF_ID) fail('LIFF ยังไม่เปิดใช้งาน', 503);
+          if (url.origin !== origin) fail('กรุณาเปิดลิงก์เกมหลัก', 403);
+          const csrf = random();
+          return json({ csrf }, 200, { 'Set-Cookie': cookie('mk_liff', csrf, 300) });
+        }
+        if (url.pathname === '/api/liff/session' && request.method === 'POST') {
+          if (!lineReady || !env.LIFF_ID) fail('LIFF ยังไม่เปิดใช้งาน', 503);
+          const binding = readCookies(request).mk_liff;
+          if (url.origin !== origin || request.headers.get('Origin') !== origin || !binding ||
+            !equal(binding, request.headers.get('X-CSRF-Token'))) fail('กรุณาเปิดเกมใหม่จาก LINE', 403);
+          const data = await readBody(request);
+          if (typeof data.idToken !== 'string' || data.idToken.length > 6000 || !data.idToken) fail('ไม่พบข้อมูลยืนยัน LINE', 401);
+          const identity = await linePost('/oauth2/v2.1/verify', { id_token: data.idToken, client_id: env.LINE_CHANNEL_ID });
+          if (identity.iss !== 'https://access.line.me' || String(identity.aud) !== env.LINE_CHANNEL_ID ||
+            !Number.isFinite(identity.exp) || identity.exp * 1000 <= now() || typeof identity.sub !== 'string' ||
+            !/^U[0-9a-f]{32}$/i.test(identity.sub)) fail('ข้อมูลยืนยัน LINE ไม่ถูกต้อง', 401);
+          const token = random(), csrf = random();
+          const result = await db.batch([
+            stmt(`INSERT INTO users(id,line_sub,line_name,created_at) VALUES(?,?,?,?)
+              ON CONFLICT(line_sub) DO UPDATE SET line_name=excluded.line_name`, crypto.randomUUID(), identity.sub, String(identity.name || 'ผู้เล่น LINE').slice(0,100), now()),
+            stmt('DELETE FROM sessions WHERE expires_at<=?', now()),
+            stmt('INSERT INTO sessions SELECT ?,id,?,? FROM users WHERE line_sub=?', await hash(token), csrf, now() + SESSION_MS, identity.sub),
+            stmt('SELECT * FROM users WHERE line_sub=?', identity.sub)
+          ]);
+          const headers = new Headers();
+          headers.append('Set-Cookie', cookie('mk_session', token, SESSION_MS / 1000));
+          headers.append('Set-Cookie', cookie('mk_liff', '', 0));
+          return json({ user: userView(result[3].results[0]), csrf }, 200, headers);
+        }
         if (request.method === 'GET' && url.pathname === '/api/session') {
           const user = await session(false);
-          return json({ lineReady, csrf: user?.csrf || '', user: user ? userView(user) : null, penaltyMs: PENALTY_MS });
+          return json({ lineReady, csrf: user?.csrf || '', user: user ? userView(user) : null, penaltyMs: PENALTY_MS, ...(lineReady && env.LIFF_ID ? { liffId: env.LIFF_ID } : {}) });
         }
         if (request.method === 'GET' && url.pathname === '/api/leaderboard') {
           if (url.searchParams.get('rulesVersion') === '2') {

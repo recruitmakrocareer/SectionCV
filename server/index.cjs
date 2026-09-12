@@ -64,7 +64,7 @@ function createApp(options = {}) {
     CREATE INDEX IF NOT EXISTS idx_oauth_expiry ON oauth_states(expires_at);
   `);
   const root = resolve(__dirname, '..');
-  const publicFiles = new Set(['index.html', 'app.js', 'account.js', 'levels.js', 'styles.css', 'admin.html', 'admin.js',
+  const publicFiles = new Set(['index.html', 'app.js', 'account.js', 'liff.js', 'levels.js', 'styles.css', 'admin.html', 'admin.js',
     'memory-game/index.html', 'docs/memory-game/index.html', ...levels.flatMap((l) => [l.original, l.edited])]);
   const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.webp': 'image/webp' };
   const callback = `${origin}/auth/line/callback`;
@@ -145,7 +145,7 @@ function createApp(options = {}) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://static.line-scdn.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.line.me https://access.line.me https://liff.line.me; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
     if (secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
     const url = new URL(req.url, origin);
     try {

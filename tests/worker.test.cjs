@@ -393,3 +393,37 @@ test('manual LINE login disables only auto login while retaining OAuth state, no
   }
   assert.match(fallback.headers.get('Set-Cookie'), /mk_oauth=.*HttpOnly.*SameSite=Lax.*Secure/);
 });
+
+test('LIFF verifies tokens server-side, preserves registered contacts and rejects cross-site or wrong-channel login', async (t) => {
+  let identity, calls = 0;
+  const f = await fixture(t, { lineFetch: async (url, init) => {
+    calls++;
+    assert.equal(url, 'https://api.line.me/oauth2/v2.1/verify');
+    assert.equal(init.body.get('id_token'), 'fixture-id-token');
+    assert.equal(init.body.get('client_id'), '2011516015');
+    return Response.json(identity);
+  } });
+  f.env.LIFF_ID = '2011516015-Fixture';
+  const user = await DB.prepare('SELECT * FROM users WHERE id=?').bind(f.id).first();
+  identity = { iss:'https://access.line.me', aud:'2011516015', exp:f.now()/1000+300, sub:user.line_sub, name:'Verified LINE name' };
+  const config = await f.raw('/api/liff/config');
+  const csrf = (await config.json()).csrf;
+  const headers = { Cookie:config.headers.get('Set-Cookie').split(';')[0], 'X-CSRF-Token':csrf };
+  assert.equal((await f.raw('/api/liff/session',{idToken:'fixture-id-token'}, {...headers, Origin:'https://other.test'})).status,403);
+  assert.equal(calls,0);
+  const response = await f.raw('/api/liff/session',{idToken:'fixture-id-token',name:'Forged name'},headers);
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.user.name,user.name);
+  assert.equal(data.user.phone,user.phone);
+  assert.equal(data.user.lineName,'Verified LINE name');
+  assert.equal(data.user.profileComplete,true);
+  assert.equal(JSON.stringify(data).includes('fixture-id-token'),false);
+  assert.match(response.headers.get('Set-Cookie'),/mk_session=.*HttpOnly/);
+  identity.aud='wrong-channel';
+  assert.equal((await f.raw('/api/liff/session',{idToken:'fixture-id-token'},headers)).status,401);
+  identity.aud='2011516015'; identity.exp=0;
+  assert.equal((await f.raw('/api/liff/session',{idToken:'fixture-id-token'},headers)).status,401);
+  delete f.env.LIFF_ID;
+  assert.equal((await f.raw('/api/liff/config')).status,503);
+});

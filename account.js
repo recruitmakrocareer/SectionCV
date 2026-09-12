@@ -34,7 +34,9 @@
     const inLine = /\bLine\//i.test(navigator.userAgent);
     $('#lineLogin').href = inLine ? 'auth/line/start?openExternalBrowser=1&manual=1' : 'auth/line/start';
     $('#lineLogin').textContent = inLine ? 'เข้าสู่ระบบ LINE ผ่านเบราว์เซอร์' : 'เข้าสู่ระบบด้วย LINE';
-    $('#loginHelp').hidden = !state.lineReady;
+    if (state.liffUrl) { $('#lineLogin').href = state.liffUrl; $('#lineLogin').textContent = 'เปิดเกมใน LINE'; }
+    $('#loginHelp').hidden = !state.lineReady || !!state.liffUrl;
+    $('#savePlayer').textContent = state.liffUrl && !registered ? 'บันทึกและเริ่มเกม' : 'บันทึกข้อมูลผู้เล่น';
     $('#loginStatus').textContent = state.loading ? 'กำลังตรวจการเข้าสู่ระบบ…' : state.lineReady
       ? 'เข้าสู่ระบบด้วย LINE แล้วกรอกข้อมูลเพื่อร่วมจัดอันดับ'
       : 'เปิดให้ฝึกซ้อมได้ ระบบ LINE และการบันทึกอันดับยังไม่เปิดใช้งาน';
@@ -149,6 +151,11 @@
       if (!/^https?:$/.test(location.protocol)) throw new Error('local file');
       const data = await request('api/session');
       Object.assign(state, data, { online: true });
+      if (data.liffId) {
+        state.liffUrl = `https://liff.line.me/${data.liffId}`;
+        try { Object.assign(state, await window.initializeMakroLiff(data.liffId, request)); }
+        catch (error) { state.user = null; $('#profileStatus').textContent = error.message; }
+      }
       if (state.user) {
         $('#playerName').value = state.user.name || state.user.lineName || '';
         $('#playerPhone').value = state.user.phone || '';
@@ -165,12 +172,15 @@
   $('#playerForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     if (state.saving || !$('#playerForm').reportValidity()) return;
+    const startAfterSave = !!state.liffUrl && !state.user?.profileComplete;
+    let saved = false;
     state.saving = true; render();
     try {
       const data = await request('api/profile', { name: $('#playerName').value, phone: $('#playerPhone').value, consent: $('#playerConsent').checked });
-      state.user = data.user; $('#profileStatus').textContent = 'บันทึกข้อมูลแล้ว พร้อมเริ่มเกม';
+      saved = true; state.user = data.user; $('#profileStatus').textContent = 'บันทึกข้อมูลแล้ว พร้อมเริ่มเกม';
     } catch (error) { $('#profileStatus').textContent = error.message; }
     finally { state.saving = false; render(); }
+    if (saved && startAfterSave) window.dispatchEvent(new CustomEvent('account:start'));
   });
   $('#logoutButton').addEventListener('click', async () => {
     try { await request('api/logout', {}); location.reload(); }

@@ -125,3 +125,18 @@ npm run dev:worker
 
 
 เอกสาร LINE: [LINE Login สำหรับ Web app](https://developers.line.biz/en/docs/line-login/integrate-line-login/), [LINE Login API](https://developers.line.biz/en/reference/line-login/)
+
+## เปิดเกมด้วย LIFF (กรอกข้อมูลครั้งเดียว)
+
+โค้ด Cloudflare รองรับ LIFF แล้ว โดยจะเปิดใช้เมื่อกำหนด Runtime variable `LIFF_ID` เท่านั้น ระบบ Node สำหรับพัฒนายังใช้ OAuth เดิม
+
+1. ใน LINE Developers เลือก LINE Login Channel `2011516015` → LIFF → Add
+2. Name: `Makro Photo Game`; Size: `Full`; Endpoint URL: `https://sectioncv.recruitcpaxtramakro.workers.dev/`
+3. Scopes: `openid` และ `profile`; Add friend option: `Off`; ไม่ต้องขอ `email` หรือสิทธิ์ส่งข้อความ
+4. คัดลอก LIFF ID ที่ LINE สร้างให้ เช่นรูปแบบ `2011516015-xxxxxxxx` (ห้ามใช้ตัวอย่างนี้เป็นค่าจริง)
+5. Cloudflare → sectioncv → Settings → Runtime variables and secrets → Add variable: `LIFF_ID` = ค่าจริง → Add variable and deploy
+6. ใช้ LIFF URL ที่ LINE ให้มาแชร์ในแชต ผู้เล่นครั้งแรกยินยอมโปรไฟล์ กรอกเบอร์ และกดบันทึกและเริ่มเกม รอบต่อไปใช้ข้อมูลบัญชีเดิม
+
+เซิร์ฟเวอร์ตรวจ ID token กับ LINE โดยตรวจ channel, issuer และวันหมดอายุก่อนสร้างเซสชัน ไม่รับตัวตนจากชื่อหรือ user ID ที่ฝั่งหน้าเว็บส่งมา ไม่เก็บ ID token ในฐานข้อมูลหรือ browser storage และใช้ชื่อ/เบอร์ที่บันทึกไว้เดิมเมื่อผู้เล่นกลับมา ไม่ต้องเปลี่ยนโครงสร้าง D1
+
+อ้างอิง: https://developers.line.biz/en/docs/liff/registering-liff-apps/ และ https://developers.line.biz/en/docs/liff/using-user-profile/

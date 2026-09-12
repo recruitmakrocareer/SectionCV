@@ -22,6 +22,7 @@
   const completedFound = Array(levels.length).fill(0);
   let misses = 0;
   let starting = false;
+  let profileStartPending = false;
   let campaignStarted = false;
   let ranked = false;
   let savingScore = false;
@@ -445,7 +446,7 @@
       }
       phase = 'ready';
       render();
-      if (autoStart) startGame();
+      if (autoStart || profileStartPending) { profileStartPending = false; startGame(); }
       else openStart();
     }).catch(() => {
       if (generation !== loadGeneration) return;
@@ -482,6 +483,10 @@
     startGame();
   });
   window.addEventListener('account:change', render);
+  window.addEventListener('account:start', () => {
+    if (phase === 'ready') startGame();
+    else if (phase === 'loading') profileStartPending = true;
+  });
   $('#accountButton').addEventListener('click', () => {
     if (starting || ['playing', 'transition'].includes(phase)) return;
     openStart();
