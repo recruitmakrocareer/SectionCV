@@ -8,10 +8,11 @@ const html = readFileSync(resolve(root, 'index.html'), 'utf8');
 const script = readFileSync(resolve(root, 'account.js'), 'utf8');
 const emptyBoard = { entries: [], page: 1, totalPages: 1, totalPlayers: 0, totalRuns: 0, averageFound: 0, me: null };
 
-async function account(t, handler) {
+async function account(t, handler, userAgent) {
   const dom = new JSDOM(html, { url: 'https://game.test/', runScripts: 'outside-only' });
   dom.window.AbortSignal = AbortSignal;
   dom.window.fetch = handler;
+  if (userAgent) Object.defineProperty(dom.window.navigator, "userAgent", {value:userAgent});
   dom.window.eval(script);
   await dom.window.MAKRO_ACCOUNT.ready;
   t.after(async () => { await new Promise(setImmediate); dom.window.close(); });
@@ -138,4 +139,15 @@ test('the result popup shows the current player rank outside page one and highli
   assert.match(g.$('#resultBoardRows .is-me').textContent, /Current player \(คุณ\)/);
   assert.equal(g.$('[data-board-next]').disabled, true);
   assert.equal(g.$('[data-board-prev]').disabled, false);
+});
+
+
+test('LINE in-app login opens the OAuth start in an external browser before creating login cookies', async (t) => {
+  const g = await account(t, async () => Response.json({lineReady:true,user:null,csrf:''}), 'Mozilla/5.0 Android Line/15.0.0');
+  const link = new URL(g.$('#lineLogin').href);
+  assert.equal(link.origin, 'https://game.test');
+  assert.equal(link.pathname, '/auth/line/start');
+  assert.equal(link.searchParams.get('openExternalBrowser'), '1');
+  assert.equal(link.searchParams.get('manual'), '1');
+  assert.equal(link.searchParams.has('state'), false);
 });

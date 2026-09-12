@@ -30,6 +30,10 @@
     const registered = !!state.user?.profileComplete;
     $('#loginPanel').hidden = !!state.user;
     $('#lineLogin').hidden = !state.lineReady;
+    // Start OAuth in the browser that will receive its callback and cookie.
+    const inLine = /\bLine\//i.test(navigator.userAgent);
+    $('#lineLogin').href = inLine ? 'auth/line/start?openExternalBrowser=1&manual=1' : 'auth/line/start';
+    $('#lineLogin').textContent = inLine ? 'เข้าสู่ระบบ LINE ผ่านเบราว์เซอร์' : 'เข้าสู่ระบบด้วย LINE';
     $('#loginHelp').hidden = !state.lineReady;
     $('#loginStatus').textContent = state.loading ? 'กำลังตรวจการเข้าสู่ระบบ…' : state.lineReady
       ? 'เข้าสู่ระบบด้วย LINE แล้วกรอกข้อมูลเพื่อร่วมจัดอันดับ'

@@ -125,7 +125,7 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           if (!lineReady) fail('ระบบ LINE Login ยังไม่เปิดใช้งาน', 503);
           // Always return to the configured production origin. Do not trust Host
           // or forwarded headers, or issue a login cookie on a preview origin.
-          if (url.origin !== origin) return redirect(`${origin}/auth/line/start`);
+          if (url.origin !== origin) return redirect(`${origin}/auth/line/start${url.searchParams.get('manual') === '1' ? '?manual=1' : ''}`);
           const state = random(), binding = random(), nonce = random(), verifier = random();
           await db.batch([
             stmt('DELETE FROM oauth_states WHERE expires_at<=?', now()),
