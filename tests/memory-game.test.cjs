@@ -6,14 +6,14 @@ const path=require('node:path');
 const read=f=>readFileSync(path.join(__dirname,'..',f),'utf8');
 test('memory game survives restart during mismatch and completes with saved results',async t=>{
  const d=new JSDOM(read('memory-game/index.html'),{url:'https://game.test/memory-game/',runScripts:'outside-only'});t.after(()=>d.window.close());
- const w=d.window;w.eval(read('memory-game/game.js'));const doc=w.document;
- doc.getElementById('playerName').value='Tester';
+ const w=d.window;w.AbortSignal=AbortSignal;w.fetch=async()=>Response.json({user:{name:'LINE Tester',lineName:'LINE name'}});w.eval(read('memory-game/game.js'));const doc=w.document;
+ await new Promise(r=>setTimeout(r,0));assert.equal(doc.querySelector('input'),null);assert.match(doc.getElementById('playerIdentity').textContent,/LINE Tester/);
  let cards=[...doc.querySelectorAll('.card')];cards[0].click();cards.find(c=>c.dataset.name!==cards[0].dataset.name).click();
  doc.getElementById('restart').click();await new Promise(r=>setTimeout(r,750));
  assert.equal(doc.querySelectorAll('.flipped').length,0);assert.equal(doc.getElementById('moves').textContent,'0');
  cards=[...doc.querySelectorAll('.card')];for(const name of new Set(cards.map(c=>c.dataset.name))){for(const c of cards.filter(c=>c.dataset.name===name))c.click();}
  assert.equal(doc.getElementById('pairs').textContent,'8');assert.ok(doc.getElementById('winModal').classList.contains('show'));
- assert.equal(JSON.parse(w.localStorage.getItem('makro-memory-stats-v1'))[0].moves,8);
+ assert.equal(JSON.parse(w.localStorage.getItem('makro-memory-stats-v1'))[0].moves,8);assert.equal(JSON.parse(w.localStorage.getItem('makro-memory-stats-v1'))[0].name,'LINE Tester');
  assert.equal(doc.querySelector('a').getAttribute('href'),'../');
 });
 test('home offers both games and reveals spot game only after selection',t=>{
@@ -21,4 +21,9 @@ test('home offers both games and reveals spot game only after selection',t=>{
  w.eval(read('lobby.js'));assert.ok(w.document.body.classList.contains('choosing-game'));
  assert.ok(w.document.querySelector('#gameLobby a[href="memory-game/"]'));
  w.document.getElementById('chooseDifference').click();assert.equal(w.document.body.classList.contains('choosing-game'),false);
+});
+test('memory game does not use a previous locally stored name without a LINE session',async t=>{
+ const d=new JSDOM(read('memory-game/index.html'),{url:'https://game.test/memory-game/',runScripts:'outside-only'});t.after(()=>d.window.close());const w=d.window;w.AbortSignal=AbortSignal;
+ w.localStorage.setItem('makro-memory-player','Previous player');w.fetch=async()=>Response.json({user:null});w.eval(read('memory-game/game.js'));await new Promise(r=>setTimeout(r,0));
+ w.document.querySelector('.card').click();assert.equal(w.document.querySelectorAll('.flipped').length,0);assert.equal(w.document.getElementById('loginAgain').hidden,false);
 });
