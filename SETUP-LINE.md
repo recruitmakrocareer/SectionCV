@@ -150,3 +150,7 @@ Each round lasts 90 server-timed seconds. Correct orders award 100 points plus a
 ### Order Rush obstacle rules (v2)
 
 The current board uses separate `order_runs_v2` storage so the harder rules do not mix with previous scores. Existing `order_runs` data is retained. New clients send `rulesVersion: 2` on start; old clients are asked to reload. The shelf distinguishes apple and carrot weights and includes expired milk and fish. Expired variants are never requested. Wrong submissions lose 60 points and 5 seconds; submissions containing expired items lose 100 points and 8 seconds instead. Both reset combo and scores floor at zero. Time deductions are applied atomically with scoring and cannot be repeated by retrying a submission. Dragging and tapping share the same basket selection and server verification.
+
+### Speed scoring (v3)
+
+Current rounds use `order_runs_v3` to avoid mixing old and new scoring. Correct submissions add a server-calculated speed bonus: `max(0, 200 - floor(orderElapsedMs / 100))`. The per-order timer begins at round start or the previous correct submission, and wrong submissions do not reset it. Bonus totals appear in the result popup. Duplicate submissions do not award a second bonus. Clients send `rulesVersion: 3`. Previous tables remain intact. Combos of two or more show a short non-interactive overlay with the confirmed score increase; reduced-motion preferences disable its animation.

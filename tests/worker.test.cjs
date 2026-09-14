@@ -431,20 +431,20 @@ test('LIFF verifies tokens server-side, preserves registered contacts and reject
 test('order rush verifies orders, preserves retry scores, enforces deadlines and ranks daily without exposing contacts', async t => {
  const {orderFor}=await import('../worker/order-game.mjs');
  const f=await fixture(t); const other=await fixture(t);
- const start=await f.request('/api/orders/start',{rulesVersion:2});assert.equal(start.status,200);let run=start.body;
- assert.equal(run.remaining,90000);assert.equal((await f.request('/api/orders/start',{rulesVersion:2})).body.id,run.id);
+ const start=await f.request('/api/orders/start',{rulesVersion:3});assert.equal(start.status,200);let run=start.body;
+ assert.equal(run.remaining,90000);assert.equal((await f.request('/api/orders/start',{rulesVersion:3})).body.id,run.id);
  assert.equal((await other.request('/api/orders/submit',{id:run.id,seq:1,picks:run.order})).status,404);
  assert.equal((await f.request('/api/orders/submit',{id:run.id,seq:1,picks:run.order},{Origin:'https://evil.test'})).status,403);
  f.tick(1000);const event={id:run.id,seq:1,picks:run.order,score:999999};
  const [a,b]=await Promise.all([f.request('/api/orders/submit',event),f.request('/api/orders/submit',event)]);
- assert.equal(a.status,200);assert.equal(b.status,200);assert.equal(a.body.score,100);assert.equal(b.body.score,100);
- f.tick(1000);run=(await f.request('/api/orders/submit',{id:run.id,seq:2,picks:orderFor(run.day,1)})).body;assert.equal(run.score,220);assert.equal(run.best,2);
- f.tick(1000);run=(await f.request('/api/orders/submit',{id:run.id,seq:3,picks:Array(8).fill(0)})).body;assert.equal(run.score,160);assert.equal(run.errors,1);assert.equal(run.combo,0);assert.equal(run.orders,2);assert.equal(run.remaining,82000);assert.equal(run.order[3],0);assert.equal(run.order[7],0);
+ assert.equal(a.status,200);assert.equal(b.status,200);assert.equal(a.body.score,290);assert.equal(b.body.score,290);
+ f.tick(1000);run=(await f.request('/api/orders/submit',{id:run.id,seq:2,picks:orderFor(run.day,1)})).body;assert.equal(run.score,600);assert.equal(run.best,2);
+ f.tick(1000);run=(await f.request('/api/orders/submit',{id:run.id,seq:3,picks:Array(8).fill(0)})).body;assert.equal(run.score,540);assert.equal(run.errors,1);assert.equal(run.combo,0);assert.equal(run.orders,2);assert.equal(run.remaining,82000);assert.equal(run.order[3],0);assert.equal(run.order[7],0);
  assert.equal((await f.request('/api/orders/finish',{id:run.id})).status,409);
  f.tick(90000);const done=await f.request('/api/orders/finish',{id:run.id});assert.equal(done.body.complete,true);
- const late=await f.request('/api/orders/submit',{id:run.id,seq:4,picks:run.order});assert.equal(late.body.score,160);
- const board=(await f.request('/api/orders/board')).body;assert.equal(board.me.rank,1);assert.equal(board.me.score,160);assert.equal(board.entries[0].isMe,1);assert.ok(!JSON.stringify(board).includes('0812345678'));assert.equal(board.entries[0].user_id,undefined);
- await DB.prepare('DELETE FROM order_runs_v2 WHERE user_id IN (?,?)').bind(f.id,other.id).run();
+ const late=await f.request('/api/orders/submit',{id:run.id,seq:4,picks:run.order});assert.equal(late.body.score,540);
+ const board=(await f.request('/api/orders/board')).body;assert.equal(board.me.rank,1);assert.equal(board.me.score,540);assert.equal(board.entries[0].isMe,1);assert.ok(!JSON.stringify(board).includes('0812345678'));assert.equal(board.entries[0].user_id,undefined);
+ await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id IN (?,?)').bind(f.id,other.id).run();
 });
 
 test('order rush client plays through D1, retries a lost submit and displays confirmed results',async t=>{
@@ -456,19 +456,32 @@ test('order rush client plays through D1, retries a lost submit and displays con
  const wait=async check=>{for(let i=0;i<150;i++){if(check())return;await new Promise(r=>setTimeout(r,20));}assert.fail('client state timed out');};
  w.eval(readFileSync(join(root,'order-game/game.js'),'utf8'));await wait(()=>!w.document.getElementById('start').disabled);w.document.getElementById('start').click();await wait(()=>!w.document.getElementById('play').hidden);
  const order=orderFor(dayOf(f.now()),0),buttons=w.document.querySelectorAll('.product');order.forEach((n,i)=>{for(let k=0;k<n;k++)buttons[i].click();});f.tick(1000);
- w.document.getElementById('send').click();await wait(()=>w.document.getElementById('feedback').textContent.includes('ยืนยันรายการเดิม'));w.document.getElementById('send').click();await wait(()=>w.document.getElementById('score').textContent==='100');
+ w.document.getElementById('send').click();await wait(()=>w.document.getElementById('feedback').textContent.includes('ยืนยันรายการเดิม'));w.document.getElementById('send').click();await wait(()=>w.document.getElementById('score').textContent==='290');
+ const second=orderFor(dayOf(f.now()),1);second.forEach((n,i)=>{for(let k=0;k<n;k++)buttons[i].click();});f.tick(1000);w.document.getElementById('send').click();await wait(()=>w.document.getElementById('score').textContent==='600');
+ assert.equal(w.document.getElementById('comboBurst').hidden,false);assert.match(w.document.getElementById('comboBurst').textContent,/COMBO ×2/);
  f.tick(90000);onTick();await wait(()=>w.document.getElementById('saveStatus').textContent.includes('อันดับดีที่สุด'));
- assert.equal(w.document.getElementById('result').open,true);assert.equal(w.document.getElementById('resultScore').textContent,'100');assert.equal(w.document.querySelectorAll('.rank-row.mine').length,1);assert.equal(w.document.getElementById('again').disabled,false);
- await DB.prepare('DELETE FROM order_runs_v2 WHERE user_id=?').bind(f.id).run();
+ assert.equal(w.document.getElementById('result').open,true);assert.equal(w.document.getElementById('resultScore').textContent,'600');assert.equal(w.document.querySelectorAll('.rank-row.mine').length,1);assert.equal(w.document.getElementById('again').disabled,false);
+ await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id=?').bind(f.id).run();
 });
 
 
 test('expired products deduct time and points only once, never appear in orders, and weight variants are distinct',async t=>{
- const {orderFor}=await import('../worker/order-game.mjs');const f=await fixture(t);let r=(await f.request('/api/orders/start',{rulesVersion:2})).body;
+ const {orderFor}=await import('../worker/order-game.mjs');const f=await fixture(t);let r=(await f.request('/api/orders/start',{rulesVersion:3})).body;
  for(let i=0;i<50;i++){const o=orderFor(r.day,i);assert.equal(o[3],0);assert.equal(o[7],0);}
- f.tick(1000);r=(await f.request('/api/orders/submit',{id:r.id,seq:1,picks:r.order})).body;assert.equal(r.score,100);
- f.tick(1000);const p=Array(8).fill(0);p[3]=1;const bad={id:r.id,seq:2,picks:p};r=(await f.request('/api/orders/submit',bad)).body;assert.equal(r.score,0);assert.equal(r.remaining,80000);assert.equal(r.errors,1);assert.equal(r.combo,0);
+ f.tick(1000);r=(await f.request('/api/orders/submit',{id:r.id,seq:1,picks:r.order})).body;assert.equal(r.score,290);
+ f.tick(1000);const p=Array(8).fill(0);p[3]=1;const bad={id:r.id,seq:2,picks:p};r=(await f.request('/api/orders/submit',bad)).body;assert.equal(r.score,190);assert.equal(r.remaining,80000);assert.equal(r.errors,1);assert.equal(r.combo,0);
  const retry=(await f.request('/api/orders/submit',bad)).body;assert.equal(retry.deadline,r.deadline);assert.equal(retry.errors,1);
  const swapped=[...r.order];const pair=[[0,1],[4,5]].find(([a,b])=>swapped[a]!==swapped[b]);if(pair){const[a,b]=pair;[swapped[a],swapped[b]]=[swapped[b],swapped[a]];f.tick(1000);const wrong=(await f.request('/api/orders/submit',{id:r.id,seq:3,picks:swapped})).body;assert.equal(wrong.orders,r.orders);assert.equal(wrong.errors,2);assert.equal(wrong.deadline,r.deadline-5000);}
- await DB.prepare('DELETE FROM order_runs_v2 WHERE user_id=?').bind(f.id).run();
+ await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id=?').bind(f.id).run();
+});
+
+test('equal completed orders earn different speed scores, and errors cannot restart the bonus clock',async t=>{
+ const fast=await fixture(t),slow=await fixture(t);const a=(await fast.request('/api/orders/start',{rulesVersion:3})).body,b=(await slow.request('/api/orders/start',{rulesVersion:3})).body;
+ fast.tick(5000);slow.tick(10000);
+ const f=(await fast.request('/api/orders/submit',{id:a.id,seq:1,picks:a.order})).body;
+ const s=(await slow.request('/api/orders/submit',{id:b.id,seq:1,picks:b.order})).body;
+ assert.equal(f.orders,s.orders);assert.equal(f.score,250);assert.equal(s.score,200);assert.equal(f.speedTotal,150);assert.equal(s.speedTotal,100);
+ fast.tick(3000);await fast.request('/api/orders/submit',{id:a.id,seq:2,picks:Array(8).fill(0)});fast.tick(2000);
+ const next=(await fast.request('/api/orders/submit',{id:a.id,seq:3,picks:f.order})).body;assert.equal(next.speedTotal,300);
+ await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id IN (?,?)').bind(fast.id,slow.id).run();
 });

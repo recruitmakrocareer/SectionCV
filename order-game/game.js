@@ -17,6 +17,14 @@ function render(){
 }
 let drag=null,lastDrag=0,lastDragButton=null;
 function pick(i,b){if(!run||busy||pending||run.complete||Date.now()>=deadline||picks[i]>=9)return;picks[i]++;tone(true);animate(b,'hit');basketEffect(i,b);render();}
+let comboTimer;
+function showCombo(combo,points,speed){
+ const popup=$('comboBurst');clearTimeout(comboTimer);popup.replaceChildren();
+ const label=document.createElement('strong');label.textContent='COMBO ×'+combo;
+ const detail=document.createElement('span');detail.textContent='+'+points+' คะแนน · โบนัสเร็ว +'+speed;
+ popup.append(label,detail);popup.hidden=false;animate(popup,'burst-active');
+ comboTimer=setTimeout(()=>{popup.hidden=true;},1100);
+}
 function basketEffect(i,source){
  const basket=$('dropBasket'),cart=$('cartArt');animate(cart,'cart-bounce');animate(basket,'basket-glow');
  if(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
@@ -43,21 +51,22 @@ async function load(){
 $('retryLogin').onclick=load;
 async function start(){
  if(busy)return;busy=true;$('start').disabled=true;$('again').disabled=true;
- try{run=await api('start',{rulesVersion:2});deadline=Date.now()+run.remaining;boardDay=run.day;picks.fill(0);pending=null;$('newRound').hidden=true;$('welcome').hidden=true;$('play').hidden=false;document.body.classList.add('playing');$('result').close();$('feedback').textContent='หยิบสินค้าให้ตรงกับรายการด้านบน';busy=false;render();clearInterval(timer);timer=setInterval(tick,100);tick();window.scrollTo(0,0);}catch(e){$('identity').textContent=e.message;busy=false;$('start').disabled=false;$('again').disabled=false;}
+ try{run=await api('start',{rulesVersion:3});deadline=Date.now()+run.remaining;boardDay=run.day;picks.fill(0);pending=null;$('newRound').hidden=true;$('welcome').hidden=true;$('play').hidden=false;document.body.classList.add('playing');$('result').close();$('feedback').textContent='หยิบสินค้าให้ตรงกับรายการด้านบน';busy=false;render();clearInterval(timer);timer=setInterval(tick,100);tick();window.scrollTo(0,0);}catch(e){$('identity').textContent=e.message;busy=false;$('start').disabled=false;$('again').disabled=false;}
 }
 $('start').onclick=start;$('again').onclick=start;$('newRound').onclick=start;
 function tick(){if(!run||run.complete)return;const ms=Math.max(0,deadline-Date.now()),s=Math.ceil(ms/1000);$('time').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');$('timebar').style.width=(ms/90000*100)+'%';document.querySelector('.hud').classList.toggle('urgent',ms<=15000);if(ms===0){clearInterval(timer);if(!busy)finish();}}
 async function submit(){
  if(!run||busy||run.complete)return;if(Date.now()>=deadline){finish();return;}busy=true;
  pending??={id:run.id,seq:run.seq+1,picks:[...picks]};render();
- try{const previous=run;run=await api('submit',pending);deadline=Math.min(deadline,Date.now()+run.remaining);const expired=pending.picks[3]>0||pending.picks[7]>0;pending=null;picks.fill(0);const ok=run.orders>previous.orders;$('feedback').textContent=run.complete?'หมดเวลาแล้ว':ok?'ถูกต้อง! +'+(run.score-previous.score)+' คะแนน 🎉':expired?'หมดอายุ! −100 คะแนน · −8 วินาที · คอมโบหาย':'ผิดรายการ/น้ำหนัก! −60 คะแนน · −5 วินาที · คอมโบหาย';tone(ok);animate(document.querySelector('.basket'),ok?'hit':'miss');if(ok){animate($('score'),'score-pop');if(run.combo>1)animate($('combo'),'combo-pop');}}
+ try{const previous=run;run=await api('submit',pending);deadline=Math.min(deadline,Date.now()+run.remaining);const expired=pending.picks[3]>0||pending.picks[7]>0;pending=null;picks.fill(0);const ok=run.orders>previous.orders;$('feedback').textContent=run.complete?'หมดเวลาแล้ว':ok?'ถูกต้อง! +'+(run.score-previous.score)+' คะแนน 🎉':expired?'หมดอายุ! −100 คะแนน · −8 วินาที · คอมโบหาย':'ผิดรายการ/น้ำหนัก! −60 คะแนน · −5 วินาที · คอมโบหาย';tone(ok);animate(document.querySelector('.basket'),ok?'hit':'miss');if(ok){animate($('score'),'score-pop');if(run.combo>1){animate($('combo'),'combo-pop');showCombo(run.combo,run.score-previous.score,(run.speedTotal||0)-(previous.speedTotal||0));}}}
  catch(e){$('feedback').textContent=e.message+' · กดส่งอีกครั้งเพื่อยืนยันรายการเดิม';}
  finally{busy=false;render();if(Date.now()>=deadline||run.complete)finish();}
 }
 $('send').onclick=submit;
 function result(){
+ clearTimeout(comboTimer);$('comboBurst').hidden=true;
  $('resultScore').textContent=run.score;$('resultStats').replaceChildren();const attempts=run.orders+run.errors;
- [['ออเดอร์สำเร็จ',run.orders],['ความแม่นยำ',attempts?Math.round(run.orders/attempts*100)+'%':'0%'],['ส่งผิด',run.errors],['คอมโบสูงสุด',run.best]].forEach(([label,n])=>{const el=document.createElement('div'),b=document.createElement('b');b.textContent=n;el.append(b,document.createTextNode(label));$('resultStats').append(el);});
+ [['โบนัสความเร็วรวม',run.speedTotal||0],['ออเดอร์สำเร็จ',run.orders],['ความแม่นยำ',attempts?Math.round(run.orders/attempts*100)+'%':'0%'],['ส่งผิด',run.errors],['คอมโบสูงสุด',run.best]].forEach(([label,n])=>{const el=document.createElement('div'),b=document.createElement('b');b.textContent=n;el.append(b,document.createTextNode(label));$('resultStats').append(el);});
  if(!$('result').open)$('result').showModal();
 }
 async function finish(){
