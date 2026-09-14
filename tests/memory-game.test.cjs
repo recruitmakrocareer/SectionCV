@@ -16,11 +16,13 @@ test('memory game survives restart during mismatch and completes with saved resu
  assert.equal(JSON.parse(w.localStorage.getItem('makro-memory-stats-v1'))[0].moves,8);assert.equal(JSON.parse(w.localStorage.getItem('makro-memory-stats-v1'))[0].name,'LINE Tester');
  assert.equal(doc.querySelector('a').getAttribute('href'),'../');
 });
-test('home offers both games and reveals spot game only after selection',t=>{
- const d=new JSDOM(read('index.html'),{url:'https://game.test/',runScripts:'outside-only'});t.after(()=>d.window.close());const w=d.window;w.scrollTo=()=>{};
- w.eval(read('lobby.js'));assert.ok(w.document.body.classList.contains('choosing-game'));
- assert.ok(w.document.querySelector('#gameLobby a[href="memory-game/"]'));
- w.document.getElementById('chooseDifference').click();assert.equal(w.document.body.classList.contains('choosing-game'),false);
+test('home offers only matching and order games',t=>{
+ const d=new JSDOM(read('index.html'),{url:'https://game.test/',runScripts:'outside-only'});t.after(()=>d.window.close());
+ const doc=d.window.document;
+ assert.equal(doc.querySelectorAll('#gameLobby .game-option').length,2);
+ assert.ok(doc.querySelector('#gameLobby a[href="memory-game/"]'));
+ assert.ok(doc.querySelector('#gameLobby a[href="order-game/"]'));
+ assert.equal(doc.getElementById('chooseDifference'),null);
 });
 test('memory game does not use a previous locally stored name without a LINE session',async t=>{
  const d=new JSDOM(read('memory-game/index.html'),{url:'https://game.test/memory-game/',runScripts:'outside-only'});t.after(()=>d.window.close());const w=d.window;w.AbortSignal=AbortSignal;

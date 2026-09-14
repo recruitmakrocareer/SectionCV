@@ -431,26 +431,26 @@ test('LIFF verifies tokens server-side, preserves registered contacts and reject
 test('order rush verifies orders, preserves retry scores, enforces deadlines and ranks daily without exposing contacts', async t => {
  const {orderFor}=await import('../worker/order-game.mjs');
  const f=await fixture(t); const other=await fixture(t);
- const start=await f.request('/api/orders/start',{});assert.equal(start.status,200);let run=start.body;
- assert.equal(run.remaining,90000);assert.equal((await f.request('/api/orders/start',{})).body.id,run.id);
+ const start=await f.request('/api/orders/start',{rulesVersion:2});assert.equal(start.status,200);let run=start.body;
+ assert.equal(run.remaining,90000);assert.equal((await f.request('/api/orders/start',{rulesVersion:2})).body.id,run.id);
  assert.equal((await other.request('/api/orders/submit',{id:run.id,seq:1,picks:run.order})).status,404);
  assert.equal((await f.request('/api/orders/submit',{id:run.id,seq:1,picks:run.order},{Origin:'https://evil.test'})).status,403);
  f.tick(1000);const event={id:run.id,seq:1,picks:run.order,score:999999};
  const [a,b]=await Promise.all([f.request('/api/orders/submit',event),f.request('/api/orders/submit',event)]);
  assert.equal(a.status,200);assert.equal(b.status,200);assert.equal(a.body.score,100);assert.equal(b.body.score,100);
  f.tick(1000);run=(await f.request('/api/orders/submit',{id:run.id,seq:2,picks:orderFor(run.day,1)})).body;assert.equal(run.score,220);assert.equal(run.best,2);
- f.tick(1000);run=(await f.request('/api/orders/submit',{id:run.id,seq:3,picks:Array(8).fill(0)})).body;assert.equal(run.score,190);assert.equal(run.errors,1);assert.equal(run.combo,0);assert.equal(run.orders,2);
+ f.tick(1000);run=(await f.request('/api/orders/submit',{id:run.id,seq:3,picks:Array(8).fill(0)})).body;assert.equal(run.score,160);assert.equal(run.errors,1);assert.equal(run.combo,0);assert.equal(run.orders,2);assert.equal(run.remaining,82000);assert.equal(run.order[3],0);assert.equal(run.order[7],0);
  assert.equal((await f.request('/api/orders/finish',{id:run.id})).status,409);
  f.tick(90000);const done=await f.request('/api/orders/finish',{id:run.id});assert.equal(done.body.complete,true);
- const late=await f.request('/api/orders/submit',{id:run.id,seq:4,picks:run.order});assert.equal(late.body.score,190);
- const board=(await f.request('/api/orders/board')).body;assert.equal(board.me.rank,1);assert.equal(board.me.score,190);assert.equal(board.entries[0].isMe,1);assert.ok(!JSON.stringify(board).includes('0812345678'));assert.equal(board.entries[0].user_id,undefined);
- await DB.prepare('DELETE FROM order_runs WHERE user_id IN (?,?)').bind(f.id,other.id).run();
+ const late=await f.request('/api/orders/submit',{id:run.id,seq:4,picks:run.order});assert.equal(late.body.score,160);
+ const board=(await f.request('/api/orders/board')).body;assert.equal(board.me.rank,1);assert.equal(board.me.score,160);assert.equal(board.entries[0].isMe,1);assert.ok(!JSON.stringify(board).includes('0812345678'));assert.equal(board.entries[0].user_id,undefined);
+ await DB.prepare('DELETE FROM order_runs_v2 WHERE user_id IN (?,?)').bind(f.id,other.id).run();
 });
 
 test('order rush client plays through D1, retries a lost submit and displays confirmed results',async t=>{
  const f=await fixture(t);const {orderFor,dayOf}=await import('../worker/order-game.mjs');
  const dom=new JSDOM(readFileSync(join(root,'order-game/index.html'),'utf8'),{url:origin+'/order-game/',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
- w.AbortSignal=AbortSignal;w.Date.now=f.now;let onTick;w.setInterval=fn=>{onTick=fn;return 1;};w.clearInterval=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
+ w.AbortSignal=AbortSignal;w.Date.now=f.now;let onTick;w.setInterval=fn=>{onTick=fn;return 1;};w.clearInterval=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.scrollTo=()=>{};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  let lose=true;w.fetch=async(url,options={})=>{const p=new URL(url,origin+'/order-game/').pathname+new URL(url,origin+'/order-game/').search;const response=await f.raw(p,options.body?JSON.parse(options.body):undefined);if(p.endsWith('/submit')&&lose){lose=false;throw Error('lost response');}return response;};
  const wait=async check=>{for(let i=0;i<150;i++){if(check())return;await new Promise(r=>setTimeout(r,20));}assert.fail('client state timed out');};
@@ -459,5 +459,16 @@ test('order rush client plays through D1, retries a lost submit and displays con
  w.document.getElementById('send').click();await wait(()=>w.document.getElementById('feedback').textContent.includes('ยืนยันรายการเดิม'));w.document.getElementById('send').click();await wait(()=>w.document.getElementById('score').textContent==='100');
  f.tick(90000);onTick();await wait(()=>w.document.getElementById('saveStatus').textContent.includes('อันดับดีที่สุด'));
  assert.equal(w.document.getElementById('result').open,true);assert.equal(w.document.getElementById('resultScore').textContent,'100');assert.equal(w.document.querySelectorAll('.rank-row.mine').length,1);assert.equal(w.document.getElementById('again').disabled,false);
- await DB.prepare('DELETE FROM order_runs WHERE user_id=?').bind(f.id).run();
+ await DB.prepare('DELETE FROM order_runs_v2 WHERE user_id=?').bind(f.id).run();
+});
+
+
+test('expired products deduct time and points only once, never appear in orders, and weight variants are distinct',async t=>{
+ const {orderFor}=await import('../worker/order-game.mjs');const f=await fixture(t);let r=(await f.request('/api/orders/start',{rulesVersion:2})).body;
+ for(let i=0;i<50;i++){const o=orderFor(r.day,i);assert.equal(o[3],0);assert.equal(o[7],0);}
+ f.tick(1000);r=(await f.request('/api/orders/submit',{id:r.id,seq:1,picks:r.order})).body;assert.equal(r.score,100);
+ f.tick(1000);const p=Array(8).fill(0);p[3]=1;const bad={id:r.id,seq:2,picks:p};r=(await f.request('/api/orders/submit',bad)).body;assert.equal(r.score,0);assert.equal(r.remaining,80000);assert.equal(r.errors,1);assert.equal(r.combo,0);
+ const retry=(await f.request('/api/orders/submit',bad)).body;assert.equal(retry.deadline,r.deadline);assert.equal(retry.errors,1);
+ const swapped=[...r.order];const pair=[[0,1],[4,5]].find(([a,b])=>swapped[a]!==swapped[b]);if(pair){const[a,b]=pair;[swapped[a],swapped[b]]=[swapped[b],swapped[a]];f.tick(1000);const wrong=(await f.request('/api/orders/submit',{id:r.id,seq:3,picks:swapped})).body;assert.equal(wrong.orders,r.orders);assert.equal(wrong.errors,2);assert.equal(wrong.deadline,r.deadline-5000);}
+ await DB.prepare('DELETE FROM order_runs_v2 WHERE user_id=?').bind(f.id).run();
 });
