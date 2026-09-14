@@ -1,3 +1,4 @@
+import { orderAPI } from './order-game.mjs';
 import rules from '../server/game-rules.cjs';
 import statistics from '../server/statistics.cjs';
 
@@ -202,6 +203,7 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           const user = await session(false);
           return json({ lineReady, csrf: user?.csrf || '', user: user ? userView(user) : null, penaltyMs: PENALTY_MS, ...(lineReady && env.LIFF_ID ? { liffId: env.LIFF_ID } : {}) });
         }
+        if (request.method === 'GET' && url.pathname === '/api/orders/board') return json(await orderAPI(db, await session(), url.pathname, Object.fromEntries(url.searchParams), now()));
         if (request.method === 'GET' && url.pathname === '/api/leaderboard') {
           if (url.searchParams.get('rulesVersion') === '2') {
             const user = await session(false), page = boardPage(url);
@@ -245,6 +247,7 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           const user = await session();
           if (!origin || url.origin !== origin || request.headers.get('Origin') !== origin || !equal(request.headers.get('X-CSRF-Token'), user.csrf)) fail('คำขอไม่ถูกต้อง กรุณาโหลดหน้าใหม่', 403);
           const data = await readBody(request);
+          if (['/api/orders/start','/api/orders/submit','/api/orders/finish'].includes(url.pathname)) return json(await orderAPI(db, user, url.pathname, data, now()));
           if (url.pathname === '/api/logout') {
             await stmt('DELETE FROM sessions WHERE token_hash=?', user.token_hash).run();
             return json({ ok: true }, 200, { 'Set-Cookie': cookie('mk_session', '', 0) });

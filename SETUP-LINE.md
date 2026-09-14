@@ -140,3 +140,9 @@ npm run dev:worker
 เซิร์ฟเวอร์ตรวจ ID token กับ LINE โดยตรวจ channel, issuer และวันหมดอายุก่อนสร้างเซสชัน ไม่รับตัวตนจากชื่อหรือ user ID ที่ฝั่งหน้าเว็บส่งมา ไม่เก็บ ID token ในฐานข้อมูลหรือ browser storage และใช้ชื่อ/เบอร์ที่บันทึกไว้เดิมเมื่อผู้เล่นกลับมา ไม่ต้องเปลี่ยนโครงสร้าง D1
 
 อ้างอิง: https://developers.line.biz/en/docs/liff/registering-liff-apps/ และ https://developers.line.biz/en/docs/liff/using-user-profile/
+
+## Makro Order Rush
+
+The production Worker exposes `/api/orders/start`, `/submit`, `/finish`, and authenticated `/board` under `/api/orders/`. The first request creates the separate `order_runs` table and indexes idempotently in the existing D1 database; no manual SQL or additional binding is required. The old games' tables and rankings are unchanged. This game backend runs on the Cloudflare Worker, not the Node development server.
+
+Each round lasts 90 server-timed seconds. Correct orders award 100 points plus a consecutive-order bonus in increments of 20, capped at 100 extra. Wrong submissions subtract 30 (minimum score zero) and reset the combo. The daily order sequence is determined by the Bangkok date at round start. The daily board shows each player's best completed round, ordered by score descending, errors ascending, then deadline and run ID. Public board responses exclude contact details and LINE IDs. Returning to an unfinished round resumes its original deadline; it does not pause time. Submissions use a sequential retry payload and conditional D1 update to avoid duplicate scoring. No client-provided score or timestamp is accepted.

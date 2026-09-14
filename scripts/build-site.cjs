@@ -9,7 +9,7 @@ rmSync(join(root, '_site'), { recursive: true, force: true });
 const publicFiles = [
   'index.html', 'app.js', 'account.js', 'liff.js', 'levels.js', 'styles.css', '.nojekyll',
   'admin.html', 'admin.js', '_headers',
-  'lobby.js', 'memory-game/game.js', 'memory-game/index.html', 'docs/memory-game/index.html',
+  'order-game/index.html', 'order-game/game.js', 'order-game/style.css', 'lobby.js', 'memory-game/game.js', 'memory-game/index.html', 'docs/memory-game/index.html',
   ...levels.flatMap((level) => [level.original, level.edited])
 ];
 for (const file of publicFiles) {
