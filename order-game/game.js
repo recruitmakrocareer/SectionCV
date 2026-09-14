@@ -2,27 +2,37 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const products=[['🍎','แอปเปิล','500 กรัม'],['🍎','แอปเปิล','1 กก.'],['🥛','นม','1 ลิตร'],['🥛','นม','1 ลิตร · หมดอายุ'],['🥕','แครอต','500 กรัม'],['🥕','แครอต','1 กก.'],['🐟','ปลา','1 กก.'],['🐟','ปลา','1 กก. · หมดอายุ']];
+const art=['apple','apple','milk','milk','carrot','carrot','fish','fish'];
 let csrf='',run=null,picks=Array(8).fill(0),busy=false,deadline=0,timer=null,pending=null,page=1,boardDay='',sound=false,audio;
 async function api(path,data){const r=await fetch('../api/orders/'+path,{method:data===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(12000)});let value;try{value=await r.json();}catch{throw Error('โหลดข้อมูลไม่สำเร็จ');}if(!r.ok)throw Error(value.error||'เชื่อมต่อไม่สำเร็จ');return value;}
 function tone(ok){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.frequency.value=ok?720:190;g.gain.setValueAtTime(.07,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.12);o.start();o.stop(audio.currentTime+.13);}catch{}}
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent='เสียง: '+(sound?'เปิด':'ปิด');$('sound').setAttribute('aria-pressed',String(sound));if(sound)tone(true);};
 function animate(node,cls){node.classList.remove(cls);void node.offsetWidth;node.classList.add(cls);}
 function render(){
- $('score').textContent=run.score;$('combo').textContent='×'+run.combo;$('orderNumber').textContent='#'+(run.orders+1);
+ $('cartCount').textContent=picks.reduce((a,b)=>a+b,0)+' ชิ้น';$('score').textContent=run.score;$('combo').textContent='×'+run.combo;$('orderNumber').textContent='#'+(run.orders+1);
  $('orderItems').replaceChildren();run.order.forEach((n,i)=>{if(!n)return;const item=document.createElement('div');item.className='order-item'+(picks[i]===n?' done':'');item.textContent=products[i].join(' ')+' ×'+n;$('orderItems').append(item);});
  $('basketItems').replaceChildren();picks.forEach((n,i)=>{if(!n)return;const b=document.createElement('button');b.textContent=products[i][0]+' '+products[i][1]+' '+products[i][2]+' ×'+n+' −';b.disabled=busy||run.complete||!!pending;b.onclick=()=>{if(busy||run.complete||Date.now()>=deadline)return;picks[i]--;render();};$('basketItems').append(b);});
  $('send').disabled=busy||run.complete||!picks.some(Boolean);$('send').textContent=pending?'ลองส่งออเดอร์เดิมอีกครั้ง':busy?'กำลังตรวจออเดอร์…':'ส่งออเดอร์ →';
  document.querySelectorAll('.product').forEach(b=>b.disabled=busy||run.complete||!!pending);
 }
 let drag=null,lastDrag=0,lastDragButton=null;
-function pick(i,b){if(!run||busy||pending||run.complete||Date.now()>=deadline||picks[i]>=9)return;picks[i]++;tone(true);animate(b,'hit');render();}
+function pick(i,b){if(!run||busy||pending||run.complete||Date.now()>=deadline||picks[i]>=9)return;picks[i]++;tone(true);animate(b,'hit');basketEffect(i,b);render();}
+function basketEffect(i,source){
+ const basket=$('dropBasket'),cart=$('cartArt');animate(cart,'cart-bounce');animate(basket,'basket-glow');
+ if(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ const plus=document.createElement('span');plus.className='basket-plus';plus.textContent='+1';cart.append(plus);setTimeout(()=>plus.remove(),700);
+ // A tap flies to the cart; a pointer drop already travels with the finger.
+ if(drag?.ghost)return;
+ const from=source.getBoundingClientRect(),to=cart.getBoundingClientRect();const flying=document.createElement('img');flying.src='art/'+art[i]+'.svg';flying.alt='';flying.className='flying-product';flying.style.left=(from.left+from.width/2-25)+'px';flying.style.top=(from.top+from.height/2-25)+'px';document.body.append(flying);
+ if(flying.animate){const a=flying.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:`translate(${to.left+to.width/2-from.left-from.width/2}px,${to.top+to.height/2-from.top-from.height/2}px) scale(.45) rotate(20deg)`,opacity:.2}],{duration:420,easing:'cubic-bezier(.2,.6,.3,1)'});a.onfinish=()=>flying.remove();}setTimeout(()=>flying.remove(),500);
+}
 function clearDrag(){if(drag?.ghost)drag.ghost.remove();$('dropBasket').classList.remove('drop-ready');drag=null;}
 products.forEach(([emoji,name,variant],i)=>{
  const b=document.createElement('button');b.className='product'+([3,7].includes(i)?' expired':'');
- const icon=document.createElement('span');icon.className='emoji';icon.textContent=emoji;const label=document.createElement('span');label.textContent=name;const detail=document.createElement('small');detail.textContent=variant;b.append(icon,label,detail);b.setAttribute('aria-label','หยิบ'+name+' '+variant);
+ const icon=document.createElement('img');icon.className='product-art';icon.src='art/'+art[i]+'.svg';icon.alt='';icon.draggable=false;const label=document.createElement('span');label.textContent=name;const detail=document.createElement('small');detail.textContent=variant;b.append(icon,label,detail);b.setAttribute('aria-label','หยิบ'+name+' '+variant);
  b.onclick=()=>{if(b!==lastDragButton||Date.now()-lastDrag>400)pick(i,b);};
  b.onpointerdown=e=>{if(b.disabled||!run||run.complete||e.button!==0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY,i,b};b.setPointerCapture?.(e.pointerId);};
- b.onpointermove=e=>{if(!drag||drag.id!==e.pointerId)return;if(!drag.ghost&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>8){const ghost=document.createElement('div');ghost.className='drag-ghost';ghost.textContent=emoji+' '+name+' '+variant;document.body.append(ghost);drag.ghost=ghost;$('dropBasket').classList.add('drop-ready');}if(drag.ghost){e.preventDefault();drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px';}};
+ b.onpointermove=e=>{if(!drag||drag.id!==e.pointerId)return;if(!drag.ghost&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>8){const ghost=document.createElement('div');ghost.className='drag-ghost';const preview=document.createElement('img');preview.src='art/'+art[i]+'.svg';preview.alt='';ghost.append(preview,document.createTextNode(name+' '+variant));document.body.append(ghost);drag.ghost=ghost;$('dropBasket').classList.add('drop-ready');}if(drag.ghost){e.preventDefault();drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px';}};
  b.onpointerup=e=>{if(!drag||drag.id!==e.pointerId)return;if(drag.ghost){lastDrag=Date.now();lastDragButton=b;const r=$('dropBasket').getBoundingClientRect();if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom)pick(i,b);}clearDrag();};
  b.onpointercancel=clearDrag;$('shelf').append(b);
 });
@@ -40,7 +50,7 @@ function tick(){if(!run||run.complete)return;const ms=Math.max(0,deadline-Date.n
 async function submit(){
  if(!run||busy||run.complete)return;if(Date.now()>=deadline){finish();return;}busy=true;
  pending??={id:run.id,seq:run.seq+1,picks:[...picks]};render();
- try{const previous=run;run=await api('submit',pending);deadline=Math.min(deadline,Date.now()+run.remaining);const expired=pending.picks[3]>0||pending.picks[7]>0;pending=null;picks.fill(0);const ok=run.orders>previous.orders;$('feedback').textContent=run.complete?'หมดเวลาแล้ว':ok?'ถูกต้อง! +'+(run.score-previous.score)+' คะแนน 🎉':expired?'หมดอายุ! −100 คะแนน · −8 วินาที · คอมโบหาย':'ผิดรายการ/น้ำหนัก! −60 คะแนน · −5 วินาที · คอมโบหาย';tone(ok);animate(document.querySelector('.basket'),ok?'hit':'miss');}
+ try{const previous=run;run=await api('submit',pending);deadline=Math.min(deadline,Date.now()+run.remaining);const expired=pending.picks[3]>0||pending.picks[7]>0;pending=null;picks.fill(0);const ok=run.orders>previous.orders;$('feedback').textContent=run.complete?'หมดเวลาแล้ว':ok?'ถูกต้อง! +'+(run.score-previous.score)+' คะแนน 🎉':expired?'หมดอายุ! −100 คะแนน · −8 วินาที · คอมโบหาย':'ผิดรายการ/น้ำหนัก! −60 คะแนน · −5 วินาที · คอมโบหาย';tone(ok);animate(document.querySelector('.basket'),ok?'hit':'miss');if(ok){animate($('score'),'score-pop');if(run.combo>1)animate($('combo'),'combo-pop');}}
  catch(e){$('feedback').textContent=e.message+' · กดส่งอีกครั้งเพื่อยืนยันรายการเดิม';}
  finally{busy=false;render();if(Date.now()>=deadline||run.complete)finish();}
 }
