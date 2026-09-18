@@ -2,9 +2,20 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const products=[['🍎','แอปเปิล','500 กรัม'],['🍎','แอปเปิล','1 กก.'],['🥛','นม','1 ลิตร'],['🥛','นม','1 ลิตร · หมดอายุ'],['🥕','แครอต','500 กรัม'],['🥕','แครอต','1 กก.'],['🐟','ปลา','1 กก.'],['🐟','ปลา','1 กก. · หมดอายุ']];
-function productArt(i,cls){const ns='http://www.w3.org/2000/svg',el=document.createElementNS(ns,'svg'),image=document.createElementNS(ns,'image'),type=art[i],x=['milk','fish'].includes(type)?1:0,y=['carrot','fish'].includes(type)?1:0;el.setAttribute('class',cls);el.setAttribute('viewBox',x+' '+y+' 1 1');el.setAttribute('aria-hidden','true');image.setAttribute('href','art/products-photo.png');image.setAttribute('width','2');image.setAttribute('height','2');el.append(image);return el;}
+let artId=0;
+function productArt(i,cls){
+ const ns='http://www.w3.org/2000/svg',el=document.createElementNS(ns,'svg'),image=document.createElementNS(ns,'image'),clip=document.createElementNS(ns,'clipPath'),rect=document.createElementNS(ns,'rect'),defs=document.createElementNS(ns,'defs');
+ const type=art[i],x=['milk','fish'].includes(type)?1:0,y=['carrot','fish'].includes(type)?1:0,id='product-crop-'+(++artId);
+ el.setAttribute('class',cls);el.setAttribute('viewBox',x+' '+y+' 1 1');el.setAttribute('aria-hidden','true');
+ // Clip the atlas cell itself: a tall/wide SVG viewport exposes neighbouring
+ // cells in its letterbox area even when CSS overflow is hidden.
+ clip.setAttribute('id',id);clip.setAttribute('clipPathUnits','userSpaceOnUse');
+ for(const [name,value] of Object.entries({x,y,width:1,height:1}))rect.setAttribute(name,String(value));
+ clip.append(rect);defs.append(clip);image.setAttribute('clip-path','url(#'+id+')');
+ image.setAttribute('href','art/products-photo.png');image.setAttribute('width','2');image.setAttribute('height','2');el.append(defs,image);return el;
+}
 const art=['apple','apple','milk','milk','carrot','carrot','fish','fish'];
-let warnedSecond=-1,customerTimer,customerUntil=0,orderClock=0,personalBest=0;
+let warnedSecond=-1,customerTimer,customerUntil=0,complaintCount=0,orderClock=0,personalBest=0;
 let csrf='',run=null,picks=Array(8).fill(0),busy=false,deadline=0,timer=null,pending=null,page=1,boardDay='',sound=false,audio;
 async function api(path,data){const r=await fetch('../api/orders/'+path,{method:data===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(12000)});let value;try{value=await r.json();}catch{throw Error('โหลดข้อมูลไม่สำเร็จ');}if(!r.ok)throw Error(value.error||'เชื่อมต่อไม่สำเร็จ');return value;}
 function tone(ok){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.frequency.value=ok?720:190;g.gain.setValueAtTime(.07,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.12);o.start();o.stop(audio.currentTime+.13);}catch{}}
@@ -21,8 +32,27 @@ let drag=null,lastDrag=0,lastDragButton=null;
 function pick(i,b){if(!run||busy||pending||run.complete||Date.now()>=deadline||picks[i]>=9)return;picks[i]++;const wrong=picks[i]>run.order[i];tone(!wrong);if(wrong)customerComplaint(i);animate(b,'hit');basketEffect(i,b);render();}
 function customerComplaint(i){
  if(Date.now()<customerUntil)return;customerUntil=Date.now()+1200;
- const lines=[3,7].includes(i)?['หมดอายุแล้ว! ลูกค้าไม่ใช่เครื่องย้อนเวลานะ!','ขอของสด ไม่เอาของสะสมครับ!']:run.order[i]===0?['หยิบอะไรมาเนี่ย! ดูออเดอร์หน่อย!','ไม่ได้สั่งอันนี้! ใจเย็นแล้วอ่านใหม่ครับ!']:['เยอะไปแล้ว! สั่งของ ไม่ได้เหมาทั้งชั้น!','จำนวนเกินแล้ว เช็กตะกร้าหน่อยครับ!'];
- const bubble=$('customerBubble');bubble.textContent='ลูกค้า: '+lines[run.seq%lines.length];bubble.hidden=false;clearTimeout(customerTimer);animate(bubble,'customer-pop');customerTimer=setTimeout(()=>bubble.hidden=true,2200);
+ const otherSize=products.findIndex((p,j)=>j!==i&&p[1]===products[i][1]&&run.order[j]>0);
+ const lines=[3,7].includes(i)?[
+  'หมดอายุแล้ว ยังจะหยิบมาอีก! ดูวันที่บ้างดิ!',
+  'ของหมดอายุจะเอามาให้กินเนี่ยนะ? เอากลับไป!',
+  'นี่จะขายของหรือจะให้ท้องเสีย? ดูวันหมดอายุด้วย!',
+  'โห ของเสียยังกล้าหยิบมาอีกเหรอ!'
+ ]:run.order[i]===0&&otherSize>=0?[
+  'สั่ง '+products[otherSize][2]+' ไม่ใช่ '+products[i][2]+'! ดูให้ดีดิ!',
+  'ชื่อเหมือนกันแล้วไง น้ำหนักมันคนละอัน!',
+  'อ่านให้จบดิ น้ำหนักก็เขียนอยู่เนี่ย!'
+ ]:run.order[i]===0?[
+  'โคตรมั่วเลย! สั่งอย่างนึง หยิบมาอีกอย่าง!',
+  'อ่านออเดอร์บ้างมั้ย หรือหลับตาหยิบ?',
+  'พี่ไม่ได้สั่งอันนี้! จะให้บอกอีกกี่รอบ?',
+  'รีบแล้วหยิบมั่วแบบนี้ ก็ต้องมาทำใหม่อยู่ดี!'
+ ]:[
+  'สั่งแค่นี้ หยิบเกินมาทำไม ใครจะจ่าย?',
+  'นี่นับเลขเป็นปะ? หยิบเกินแล้ว!',
+  'ไม่ได้สั่งขนาดนั้น! เอาที่เกินออกเลย!'
+ ];
+ const bubble=$('customerBubble');bubble.textContent='ลูกค้า: '+lines[complaintCount++%lines.length];bubble.hidden=false;clearTimeout(customerTimer);animate(bubble,'customer-pop');customerTimer=setTimeout(()=>bubble.hidden=true,3000);
 }
 let comboTimer;
 function showCombo(combo,points,speed){
