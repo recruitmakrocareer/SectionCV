@@ -12,7 +12,7 @@ function productArt(i,cls){
  clip.setAttribute('id',id);clip.setAttribute('clipPathUnits','userSpaceOnUse');
  for(const [name,value] of Object.entries({x,y,width:1,height:1}))rect.setAttribute(name,String(value));
  clip.append(rect);defs.append(clip);image.setAttribute('clip-path','url(#'+id+')');
- image.setAttribute('href','art/products-photo.png');image.setAttribute('width','2');image.setAttribute('height','2');el.append(defs,image);return el;
+ image.setAttribute('href','art/products-cute.png');image.setAttribute('width','2');image.setAttribute('height','2');el.append(defs,image);return el;
 }
 const art=['apple','apple','milk','milk','carrot','carrot','fish','fish'];
 let warnedSecond=-1,customerTimer,customerUntil=0,complaintCount=0,orderClock=0,personalBest=0;

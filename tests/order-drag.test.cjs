@@ -12,7 +12,7 @@ test('pointer drop adds one product, ignores outside drops, and preserves tap se
  assert.equal(w.document.getElementById('customerBubble').hidden,true,'correct picks do not upset customer');
  cards[7].click();assert.equal(w.document.getElementById('customerBubble').hidden,false);assert.match(w.document.getElementById('customerBubble').textContent,/หมดอายุ|ของสด/);
  assert.equal(w.document.getElementById('score').textContent,'0','picking feedback does not apply server submission penalties');
- assert.equal(cards[0].querySelector('image').getAttribute('href'),'art/products-photo.png');
+ assert.equal(cards[0].querySelector('image').getAttribute('href'),'art/products-cute.png');
  assert.notEqual(cards[0].querySelector('svg').getAttribute('viewBox'),cards[7].querySelector('svg').getAttribute('viewBox'));
 
 });
