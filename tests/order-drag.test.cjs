@@ -9,4 +9,10 @@ test('pointer drop adds one product, ignores outside drops, and preserves tap se
  pointer(cards[0],'pointerdown',10,10);pointer(cards[0],'pointermove',40,330);pointer(cards[0],'pointerup',40,330);cards[0].click();assert.equal(w.document.querySelectorAll('#basketItems button').length,1);assert.match(w.document.querySelector('#basketItems button').textContent,/×1/);
  pointer(cards[1],'pointerdown',10,10);pointer(cards[1],'pointermove',400,200);pointer(cards[1],'pointerup',400,200);assert.equal(w.document.querySelectorAll('#basketItems button').length,1);
  cards[2].click();assert.equal(w.document.querySelectorAll('#basketItems button').length,2);assert.equal(w.document.querySelector('.drag-ghost'),null);
+ assert.equal(w.document.getElementById('customerBubble').hidden,true,'correct picks do not upset customer');
+ cards[7].click();assert.equal(w.document.getElementById('customerBubble').hidden,false);assert.match(w.document.getElementById('customerBubble').textContent,/หมดอายุ|ของสด/);
+ assert.equal(w.document.getElementById('score').textContent,'0','picking feedback does not apply server submission penalties');
+ assert.equal(cards[0].querySelector('image').getAttribute('href'),'art/products-photo.png');
+ assert.notEqual(cards[0].querySelector('svg').getAttribute('viewBox'),cards[7].querySelector('svg').getAttribute('viewBox'));
+
 });
