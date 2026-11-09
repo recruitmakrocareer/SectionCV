@@ -17,7 +17,7 @@ let mf, DB, createWorker, bundle;
 before(async () => {
   ({ createWorker } = await import('../worker/index.mjs'));
   bundle = (await build({ entryPoints: [join(root, 'worker/index.mjs')], bundle: true, write: false, format: 'esm', platform: 'browser' })).outputFiles[0].text;
-  mf = new Miniflare({ cf: false, modules: true, script: bundle, compatibilityDate: '2026-07-30', d1Databases: ['DB'], bindings: { APP_ORIGIN: origin, LINE_CHANNEL_ID: '2011516015' } });
+  mf = new Miniflare({ cf: false, modules: true, script: bundle, compatibilityDate: '2026-07-30', d1Databases: ['DB'], durableObjects: { LOBBY: 'LobbyRoom' }, bindings: { APP_ORIGIN: origin, LINE_CHANNEL_ID: '2011516015' } });
   DB = await mf.getD1Database('DB');
   await DB.batch(schema.split(';').map((s) => s.trim()).filter(Boolean).map((s) => DB.prepare(s)));
 });
@@ -30,7 +30,16 @@ async function fixture(t, { profile = true, admin = false, lineFetch } = {}) {
   await DB.prepare('INSERT INTO users(id,line_sub,line_name,name,phone,consent_at,created_at) VALUES(?,?,?,?,?,?,?)')
     .bind(id, sub, 'LINE fixture', profile ? 'ผู้เล่นทดสอบ' : null, profile ? '0812345678' : null, profile ? clock : null, clock).run();
   await DB.prepare('INSERT INTO sessions VALUES(?,?,?,?)').bind(hash(token), id, csrf, clock + 86400000).run();
-  const env = { DB, APP_ORIGIN: origin, LINE_CHANNEL_ID: '2011516015', LINE_CHANNEL_SECRET: 'test-only', ADMIN_LINE_USER_IDS: admin ? sub : '' };
+  // Stands in for the lobby: admits this player to one round starting on first use.
+  const roundId = randomUUID();
+  let round = null;
+  const lobbyStub = { fetch: async (url) => {
+    if (new URL(url).searchParams.get('id') !== roundId) return Response.json({}, { status: 403 });
+    round ??= { id: roundId, startAt: clock, endAt: clock + 90000 };
+    return Response.json(round);
+  } };
+  const env = { DB, APP_ORIGIN: origin, LINE_CHANNEL_ID: '2011516015', LINE_CHANNEL_SECRET: 'test-only', ADMIN_LINE_USER_IDS: admin ? sub : '',
+    LOBBY: { idFromName: () => 'room', get: () => lobbyStub } };
   const worker = createWorker({ now: () => clock, lineFetch });
   const raw = (path, data, overrides = {}) => worker.fetch(new Request(origin + path, {
     method: data === undefined ? 'GET' : 'POST', body: data === undefined ? undefined : JSON.stringify(data),
@@ -45,7 +54,7 @@ async function fixture(t, { profile = true, admin = false, lineFetch } = {}) {
       DB.prepare('DELETE FROM users WHERE id=?').bind(id)
     ]);
   });
-  return { id, token, csrf, env, worker, request, raw, tick: (ms) => { clock += ms; }, now: () => clock };
+  return { id, token, csrf, roundId, env, worker, request, raw, tick: (ms) => { clock += ms; }, now: () => clock };
 }
 
 test('bundled Worker runs in workerd with real D1 and never enables LINE without its secret', async () => {
@@ -431,8 +440,10 @@ test('LIFF verifies tokens server-side, preserves registered contacts and reject
 test('order rush verifies orders, preserves retry scores, enforces deadlines and ranks daily without exposing contacts', async t => {
  const {orderFor}=await import('../worker/order-game.mjs');
  const f=await fixture(t); const other=await fixture(t);
- const start=await f.request('/api/orders/start',{rulesVersion:3});assert.equal(start.status,200);let run=start.body;
- assert.equal(run.remaining,90000);assert.equal((await f.request('/api/orders/start',{rulesVersion:3})).body.id,run.id);
+ assert.equal((await f.request('/api/orders/start',{rulesVersion:3})).status,409,'a ranked run cannot start outside the lobby');
+ assert.equal((await f.request('/api/orders/start',{rulesVersion:3,roundId:other.roundId})).status,409,'a player cannot enter a round they were not admitted to');
+ const start=await f.request('/api/orders/start',{rulesVersion:3,roundId:f.roundId});assert.equal(start.status,200);let run=start.body;
+ assert.equal(run.remaining,90000);assert.equal((await f.request('/api/orders/start',{rulesVersion:3,roundId:f.roundId})).body.id,run.id);
  assert.equal((await other.request('/api/orders/submit',{id:run.id,seq:1,picks:run.order})).status,404);
  assert.equal((await f.request('/api/orders/submit',{id:run.id,seq:1,picks:run.order},{Origin:'https://evil.test'})).status,403);
  f.tick(1000);const event={id:run.id,seq:1,picks:run.order,score:999999};
@@ -454,19 +465,51 @@ test('order rush client plays through D1, retries a lost submit and displays con
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  let lose=true;w.fetch=async(url,options={})=>{const p=new URL(url,origin+'/order-game/').pathname+new URL(url,origin+'/order-game/').search;const response=await f.raw(p,options.body?JSON.parse(options.body):undefined);if(p.endsWith('/submit')&&lose){lose=false;throw Error('lost response');}return response;};
  const wait=async check=>{for(let i=0;i<150;i++){if(check())return;await new Promise(r=>setTimeout(r,20));}assert.fail('client state timed out');};
- w.eval(readFileSync(join(root,'order-game/game.js'),'utf8'));await wait(()=>!w.document.getElementById('start').disabled);w.document.getElementById('start').click();await wait(()=>!w.document.getElementById('play').hidden);
+ const realFetch=w.fetch;let inflight=0;w.fetch=(...args)=>{inflight++;return realFetch(...args).finally(()=>setTimeout(()=>{inflight--;},20));};
+ let socket;w.WebSocket=class{constructor(url){socket=this;this.url=String(url);this.readyState=1;this.sent=[];}send(text){this.sent.push(JSON.parse(text));}};
+ const state=extra=>socket.onmessage({data:JSON.stringify({type:'state',serverNow:f.now(),phase:'waiting',readyDeadline:null,count:2,readyCount:0,players:[{name:'ผู้เล่นทดสอบ',ready:false,me:true},{name:'เพื่อน',ready:false,me:false}],roundId:null,startAt:null,endAt:null,you:{ready:false,inRound:false},lastRound:null,...extra})});
+ w.eval(readFileSync(join(root,'order-game/game.js'),'utf8'));await wait(()=>socket?.onmessage);assert.equal(socket.url,'wss://game.test/api/lobby/ws');state();await wait(()=>!w.document.getElementById('start').disabled);
+ assert.equal(w.document.querySelectorAll('#lobbyPlayers li').length,2);w.document.getElementById('start').click();assert.deepEqual(socket.sent,[{type:'ready',ready:true}]);assert.equal(w.document.getElementById('play').hidden,true,'readying up alone must not start the game');
+ state({phase:'round',roundId:f.roundId,startAt:f.now(),endAt:f.now()+90000,you:{ready:true,inRound:true}});await wait(()=>!w.document.getElementById('play').hidden);
  const order=orderFor(dayOf(f.now()),0),buttons=w.document.querySelectorAll('.product');order.forEach((n,i)=>{for(let k=0;k<n;k++)buttons[i].click();});f.tick(1000);
  w.document.getElementById('send').click();await wait(()=>w.document.getElementById('feedback').textContent.includes('ยืนยันรายการเดิม'));w.document.getElementById('send').click();await wait(()=>w.document.getElementById('score').textContent==='290');
  const second=orderFor(dayOf(f.now()),1);second.forEach((n,i)=>{for(let k=0;k<n;k++)buttons[i].click();});f.tick(1000);w.document.getElementById('send').click();await wait(()=>w.document.getElementById('score').textContent==='600');
  assert.equal(w.document.getElementById('comboBurst').hidden,false);assert.match(w.document.getElementById('comboBurst').textContent,/COMBO ×2/);
  f.tick(90000);onTick();await wait(()=>w.document.getElementById('saveStatus').textContent.includes('อันดับดีที่สุด'));
  assert.equal(w.document.getElementById('result').open,true);assert.equal(w.document.getElementById('resultScore').textContent,'600');assert.equal(w.document.querySelectorAll('.rank-row.mine').length,1);assert.equal(w.document.getElementById('again').disabled,false);
+ assert.match(w.document.getElementById('roundTopStatus').textContent,/รอผู้เล่นคนอื่น/);
+ state({lastRound:{roundId:f.roundId,failed:false,top:[{rank:1,name:'<b>ผู้ชนะ</b>',score:600,errors:0,orders:2,isMe:true}]}});
+ assert.equal(w.document.querySelector('#roundTopRows li.mine span').textContent,'<b>ผู้ชนะ</b>','player names render as text');assert.equal(w.document.getElementById('roundTopStatus').textContent,'');
+ w.document.getElementById('again').click();assert.equal(w.document.getElementById('welcome').hidden,false);assert.equal(w.document.getElementById('play').hidden,true);assert.equal(w.document.getElementById('start').textContent,'กดเตรียมพร้อม');
+ await wait(()=>inflight===0);
  await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id=?').bind(f.id).run();
+});
+
+test('lobby runs in workerd: all ready starts one shared round and only its players can join', async t => {
+ const a=await fixture(t),b=await fixture(t),outsider=await fixture(t);
+ const connect=async f=>{
+  const response=await mf.dispatchFetch(origin+'/api/lobby/ws',{headers:{Upgrade:'websocket',Origin:origin,Cookie:`mk_session=${f.token}`}});
+  assert.equal(response.status,101);const ws=response.webSocket;const states=[];ws.addEventListener('message',e=>states.push(JSON.parse(e.data)));ws.accept();return {ws,states};
+ };
+ const until=async(client,check)=>{for(let i=0;i<200;i++){const hit=client.states.findLast(check);if(hit)return hit;await new Promise(r=>setTimeout(r,20));}assert.fail('lobby state timed out');};
+ const start=(f,roundId)=>mf.dispatchFetch(origin+'/api/orders/start',{method:'POST',headers:{Cookie:`mk_session=${f.token}`,Origin:origin,'X-CSRF-Token':f.csrf,'Content-Type':'application/json'},body:JSON.stringify({rulesVersion:3,roundId})});
+ assert.equal((await mf.dispatchFetch(origin+'/api/lobby/ws',{headers:{Upgrade:'websocket',Origin:'https://evil.test',Cookie:`mk_session=${a.token}`}})).status,403,'a cross-site page cannot open a player socket');
+ assert.equal((await mf.dispatchFetch(origin+'/api/lobby/ws',{headers:{Upgrade:'websocket',Origin:origin}})).status,401);
+ const first=await connect(a),second=await connect(b);
+ await until(first,s=>s.count===2);assert.ok(!JSON.stringify(first.states).includes('0812345678'),'contact numbers never reach the lobby');
+ first.ws.send(JSON.stringify({type:'ready',ready:true}));await until(second,s=>s.readyCount===1);assert.equal(second.states.at(-1).phase,'waiting');
+ second.ws.send(JSON.stringify({type:'ready',ready:true}));
+ const roundA=await until(first,s=>s.phase==='round'),roundB=await until(second,s=>s.phase==='round');
+ assert.equal(roundA.roundId,roundB.roundId);assert.equal(roundA.startAt,roundB.startAt);assert.equal(roundA.you.inRound,true);
+ const run=await start(a,roundA.roundId);assert.equal(run.status,200);const body=await run.json();assert.ok(body.id.startsWith(`round:${roundA.roundId}:`));assert.equal(body.deadline,roundA.endAt);
+ assert.equal((await start(outsider,roundA.roundId)).status,409);
+ first.ws.close();second.ws.close();
+ await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id IN (?,?)').bind(a.id,b.id).run();
 });
 
 
 test('expired products deduct time and points only once, never appear in orders, and weight variants are distinct',async t=>{
- const {orderFor}=await import('../worker/order-game.mjs');const f=await fixture(t);let r=(await f.request('/api/orders/start',{rulesVersion:3})).body;
+ const {orderFor}=await import('../worker/order-game.mjs');const f=await fixture(t);let r=(await f.request('/api/orders/start',{rulesVersion:3,roundId:f.roundId})).body;
  for(let i=0;i<50;i++){const o=orderFor(r.day,i);assert.equal(o[3],0);assert.equal(o[7],0);}
  f.tick(1000);r=(await f.request('/api/orders/submit',{id:r.id,seq:1,picks:r.order})).body;assert.equal(r.score,290);
  f.tick(1000);const p=Array(8).fill(0);p[3]=1;const bad={id:r.id,seq:2,picks:p};r=(await f.request('/api/orders/submit',bad)).body;assert.equal(r.score,190);assert.equal(r.remaining,80000);assert.equal(r.errors,1);assert.equal(r.combo,0);
@@ -476,7 +519,7 @@ test('expired products deduct time and points only once, never appear in orders,
 });
 
 test('equal completed orders earn different speed scores, and errors cannot restart the bonus clock',async t=>{
- const fast=await fixture(t),slow=await fixture(t);const a=(await fast.request('/api/orders/start',{rulesVersion:3})).body,b=(await slow.request('/api/orders/start',{rulesVersion:3})).body;
+ const fast=await fixture(t),slow=await fixture(t);const a=(await fast.request('/api/orders/start',{rulesVersion:3,roundId:fast.roundId})).body,b=(await slow.request('/api/orders/start',{rulesVersion:3,roundId:slow.roundId})).body;
  fast.tick(5000);slow.tick(10000);
  const f=(await fast.request('/api/orders/submit',{id:a.id,seq:1,picks:a.order})).body;
  const s=(await slow.request('/api/orders/submit',{id:b.id,seq:1,picks:b.order})).body;
