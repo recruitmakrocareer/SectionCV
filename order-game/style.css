@@ -44,3 +44,25 @@ body.playing .drop-ready{border-color:#f22840;background:#fff2e3;outline:2px das
 .drag-preview{width:54px;height:54px;flex-shrink:0}body.playing .product{background:linear-gradient(145deg,#fffdf9,#f6eddd);box-shadow:0 5px 0 #d8c9b7,0 8px 14px #563d2220}.pressure-line{min-height:29px}.hud.urgent #time{color:#fff1a8;text-shadow:0 0 12px #ffed9d80}
 
 .product-art,.drag-preview,.flying-product{overflow:hidden;border-radius:8px}
+
+/* Shared waiting room and Top 5 lists */
+.lobby{margin:18px 0;padding:16px;border:2px solid #db1628;border-radius:16px;background:#fff7f7;text-align:center}
+.lobby h3,.lobby-tops h3,.round-top h3{margin:0 0 8px;font-size:1.05rem}
+.lobby p{margin:4px 0}
+.lobby-clock{display:block;min-height:1.4em;color:#db1628;font-size:2rem;line-height:1.4}
+.lobby-players,.top-five{margin:10px 0 0;padding:0;list-style:none;text-align:left}
+.lobby-players{max-height:220px;overflow-y:auto}
+.lobby-players li,.top-five li{display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border-bottom:1px solid #eadfe0}
+.lobby-players li span,.top-five li span{min-width:0;overflow-wrap:anywhere}
+.lobby-players li b,.top-five li b{flex:none}
+.lobby-players li b{color:#6b7280;font-weight:500}
+.lobby-players li.ready b{color:#14803c;font-weight:700}
+.top-five{counter-reset:top}
+.top-five li:not(.empty)::before{counter-increment:top;content:counter(top);flex:none;width:1.5em;font-weight:700;color:#db1628}
+.top-five li span{flex:1}
+.top-five li.mine{background:#fff0c9;font-weight:700}
+.top-five li.empty{color:#6b7280}
+.lobby-tops{display:grid;gap:18px;margin-top:20px;text-align:left}
+.lobby-tops[hidden],.lobby-tops section[hidden]{display:none}
+.round-top{margin:14px 0;text-align:left}
+@media(min-width:700px){.lobby-tops{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}}
