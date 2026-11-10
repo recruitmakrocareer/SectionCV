@@ -66,3 +66,10 @@ body.playing .drop-ready{border-color:#f22840;background:#fff2e3;outline:2px das
 .lobby-tops[hidden],.lobby-tops section[hidden]{display:none}
 .round-top{margin:14px 0;text-align:left}
 @media(min-width:700px){.lobby-tops{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}}
+/* Join with a display name instead of LINE */
+.guest-form{display:grid;gap:10px;max-width:360px;margin:18px auto 0;text-align:left}
+.guest-form[hidden]{display:none}
+.guest-form label{font-weight:700}
+.guest-form input{font:inherit;font-size:16px;padding:12px 14px;border:2px solid #d9c5c7;border-radius:12px}
+.guest-form input:focus{outline:3px solid #ffb5b9;border-color:#db1628}
+.guest-form p{margin:0;min-height:1.2em}

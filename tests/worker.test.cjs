@@ -528,3 +528,42 @@ test('equal completed orders earn different speed scores, and errors cannot rest
  const next=(await fast.request('/api/orders/submit',{id:a.id,seq:3,picks:f.order})).body;assert.equal(next.speedTotal,300);
  await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id IN (?,?)').bind(fast.id,slow.id).run();
 });
+
+test('guests join with a display name instead of LINE and can enter the lobby round', async t => {
+ const f=await fixture(t);
+ const guest=(body,headers={})=>f.worker.fetch(new Request(origin+'/api/guest',{method:'POST',body:JSON.stringify(body),headers:{Origin:origin,'Content-Type':'application/json',...headers}}),f.env);
+ assert.equal((await guest({name:'มะม่วง'},{Origin:'https://evil.test'})).status,403,'another site cannot create a player');
+ assert.equal((await guest({name:'x'})).status,400);
+ assert.equal((await guest({name:'a\u202eb'})).status,400);
+ const made=await guest({name:'  น้อง   มะม่วง '});assert.equal(made.status,201);
+ const {user,csrf}=await made.json();assert.equal(user.name,'น้อง มะม่วง');assert.equal(user.phone,'');assert.equal(user.admin,false);
+ const token=/mk_session=([^;]+)/.exec(made.headers.get('Set-Cookie'))[1];
+ assert.match(made.headers.get('Set-Cookie'),/HttpOnly/);
+ const as=(path,data)=>f.worker.fetch(new Request(origin+path,{method:data===undefined?'GET':'POST',body:data===undefined?undefined:JSON.stringify(data),headers:{Cookie:`mk_session=${token}`,Origin:origin,'X-CSRF-Token':csrf,'Content-Type':'application/json'}}),f.env);
+ const me=await (await as('/api/session')).json();assert.equal(me.user.name,'น้อง มะม่วง');assert.equal(me.csrf,csrf);
+ const again=await (await as('/api/guest',{name:'ชื่ออื่น'})).json();assert.equal(again.user.name,'น้อง มะม่วง','an existing session is reused, not duplicated');
+ const run=await as('/api/orders/start',{rulesVersion:3,roundId:f.roundId});assert.equal(run.status,200);
+ const admin=await (await f.worker.fetch(new Request(origin+'/api/admin/players',{headers:{Cookie:`mk_session=${token}`}}),f.env));assert.equal(admin.status,403);
+ const row=await DB.prepare("SELECT id FROM users WHERE line_sub LIKE 'guest:%' AND name=?").bind('น้อง มะม่วง').first();
+ await DB.batch([DB.prepare('DELETE FROM order_runs_v3 WHERE user_id=?').bind(row.id),DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(row.id),DB.prepare('DELETE FROM users WHERE id=?').bind(row.id)]);
+});
+
+test('order rush shows a name form when not signed in and continues into the lobby', async t => {
+ const dom=new JSDOM(readFileSync(join(root,'order-game/index.html'),'utf8'),{url:origin+'/order-game/',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
+ w.AbortSignal=AbortSignal;w.scrollTo=()=>{};let signedIn=false,sentName=null,socket=null;
+ w.WebSocket=class{constructor(){socket=this;this.readyState=1;}send(){}};
+ w.fetch=async(url,options={})=>{
+  if(url.includes('api/guest')){sentName=JSON.parse(options.body).name;signedIn=true;return Response.json({user:{name:sentName},csrf:'c'},{status:201});}
+  if(url.includes('api/session'))return Response.json(signedIn?{user:{name:sentName},csrf:'c'}:{user:null,csrf:''});
+  return Response.json({entries:[],total:0,page:1,day:'2026-11-10'});
+ };
+ const wait=async check=>{for(let i=0;i<100;i++){if(check())return;await new Promise(r=>setTimeout(r,10));}assert.fail('client state timed out');};
+ w.eval(readFileSync(join(root,'order-game/game.js'),'utf8'));
+ await wait(()=>!w.document.getElementById('guestForm').hidden);
+ assert.equal(w.document.getElementById('start').hidden,true);assert.equal(socket,null,'no lobby connection before a player exists');
+ w.document.getElementById('guestName').value='ผู้เล่นใหม่';w.document.getElementById('guestForm').dispatchEvent(new w.Event('submit',{cancelable:true}));
+ await wait(()=>socket!==null);
+ assert.equal(sentName,'ผู้เล่นใหม่');assert.equal(w.document.getElementById('guestForm').hidden,true);assert.equal(w.document.getElementById('start').hidden,false);
+ assert.match(w.document.getElementById('identity').textContent,/ผู้เล่นใหม่/);
+ await wait(()=>w.document.getElementById('myRank').textContent!=='');
+});
