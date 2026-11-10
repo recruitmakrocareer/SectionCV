@@ -20,11 +20,29 @@ export class LobbyRoom {
 
   // Sockets survive hibernation; their player data lives in the attachment.
   sockets(excluded) {
-    return this.ctx.getWebSockets().filter((ws) => ws !== excluded && ws.readyState === OPEN);
+    return this.ctx.getWebSockets().filter((ws) => ws !== excluded && ws.readyState === OPEN && !ws.deserializeAttachment()?.removed);
   }
 
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === '/remove' && request.method === 'POST') {
+      if (this.state.phase !== 'waiting') return Response.json({ error: 'นำผู้เล่นออกได้เฉพาะตอนอยู่ห้องรอ' }, { status: 409 });
+      const { playerId } = await request.json();
+      if (typeof playerId !== 'string' || !/^[\w-]{36}$/.test(playerId)) return Response.json({ error: 'ข้อมูลผู้เล่นไม่ถูกต้อง' }, { status: 400 });
+      const ws = this.sockets().find(socket => socket.deserializeAttachment().kickId === playerId);
+      if (!ws) return Response.json({ error: 'ผู้เล่นออกจากห้องแล้ว กรุณาตรวจรายชื่ออีกครั้ง' }, { status: 404 });
+      const player = ws.deserializeAttachment();
+      if (player.ready) return Response.json({ error: 'ผู้เล่นคนนี้กดพร้อมแล้ว ไม่สามารถนำออกได้' }, { status: 409 });
+      // Exclude immediately even while the close handshake is still pending.
+      ws.serializeAttachment({ ...player, removed: true, ready: false });
+      // Older clients already stop reconnecting for 4000. New clients use the
+      // reason to distinguish admin removal from opening another browser tab.
+      try { ws.send(JSON.stringify({ ...this.view({ ...player, ready: false }, this.sockets().map(socket => socket.deserializeAttachment()), this.now()), removed: true })); } catch {}
+      try { ws.close(4000, 'removed-by-admin'); } catch {}
+      await this.evaluate();
+      this.broadcast();
+      return Response.json({ ok: true });
+    }
     if (url.pathname === '/start' && request.method === 'POST') {
       const players = this.sockets().map((ws) => ws.deserializeAttachment());
       if (this.state.phase !== 'waiting' || players.length < 1 || !players.every((player) => player.ready)) {
@@ -42,12 +60,17 @@ export class LobbyRoom {
     }
     if (url.pathname === '/status') {
       // Read-only room snapshot for the admin live board. No user ids leave here.
-      const players = this.sockets().map((ws) => ws.deserializeAttachment());
+      const players = this.sockets().map((ws) => {
+        const player = ws.deserializeAttachment();
+        // Assign connection-scoped opaque ids to sockets from older releases too.
+        if (!player.kickId) { player.kickId = crypto.randomUUID(); ws.serializeAttachment(player); }
+        return player;
+      });
       const { phase, round, readyDeadline, lastRound } = this.state;
       return Response.json({
         canStart: phase === 'waiting' && players.length >= 1 && players.every((player) => player.ready),
         phase, readyDeadline, count: players.length, readyCount: players.filter((player) => player.ready).length,
-        players: players.slice(0, MAX_LISTED).map((player) => ({ name: player.name, ready: player.ready })),
+        players: players.slice(0, MAX_LISTED).map((player) => ({ id: player.kickId, name: player.name, ready: player.ready, canRemove: phase === 'waiting' && !player.ready })),
         round: round && { id: round.id, startAt: round.startAt, endAt: round.endAt, count: round.players.length },
         lastRound: lastRound && { roundId: lastRound.roundId, failed: lastRound.failed,
           top: lastRound.top.map(({ userId, ...row }, index) => ({ ...row, rank: index + 1 })) }
@@ -60,13 +83,14 @@ export class LobbyRoom {
     for (const old of this.ctx.getWebSockets(userId)) old.close(4000, 'replaced');
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server, [userId]);
-    server.serializeAttachment({ userId, name, ready: false });
+    server.serializeAttachment({ userId, name, ready: false, kickId: crypto.randomUUID() });
     await this.evaluate();
     this.broadcast();
     return new Response(null, { status: 101, webSocket: client });
   }
 
   async webSocketMessage(ws, message) {
+    if (ws.deserializeAttachment()?.removed) return;
     if (typeof message !== 'string' || message.length > 200) return;
     let data;
     try { data = JSON.parse(message); } catch { return; }

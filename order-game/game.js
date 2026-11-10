@@ -16,6 +16,7 @@ function productArt(i,cls){
 }
 const art=['apple','apple','milk','milk','carrot','carrot','fish','fish'];
 let warnedSecond=-1,customerTimer,customerUntil=0,complaintCount=0,orderClock=0,personalBest=0;
+let removedByAdmin=false;
 let socket=null,lobby=null,clockOffset=-Infinity,reconnectDelay=1000,lobbyNotice='',joinedRound=null,currentRound=null,beginTimer;
 let tapQueue=[],tapFailed=false;
 let csrf='',run=null,picks=Array(8).fill(0),busy=false,deadline=0,timer=null,pending=null,page=1,boardDay='',sound=false,audio;
@@ -102,12 +103,12 @@ $('guestForm').onsubmit=async e=>{
 const serverNow=()=>Date.now()+clockOffset;
 const fromServer=ms=>ms-clockOffset;
 function connectLobby(){
- if(socket&&socket.readyState<=1)return;
+ if(removedByAdmin||socket&&socket.readyState<=1)return;
  const url=new URL('../api/lobby/ws',location.href);url.protocol=url.protocol==='https:'?'wss:':'ws:';
  clockOffset=-Infinity;socket=new WebSocket(url);
  socket.onopen=()=>{reconnectDelay=1000;};
- socket.onmessage=e=>{try{applyLobby(JSON.parse(e.data));}catch{}};
- socket.onclose=e=>{renderLobby();if(e.code===4000){lobbyNotice='เปิดเกมอยู่ในหน้าจออื่น กรุณาโหลดหน้านี้ใหม่หากต้องการเล่นที่นี่';renderLobbyClock();return;}lobbyNotice='การเชื่อมต่อสะดุด กำลังเข้าห้องรอใหม่…';renderLobbyClock();setTimeout(connectLobby,reconnectDelay);reconnectDelay=Math.min(15000,reconnectDelay*2);};
+ socket.onmessage=e=>{try{const state=JSON.parse(e.data);if(state.removed){removedByAdmin=true;lobby=state;lobbyNotice='Admin นำคุณออกจากห้องรอแล้ว หากต้องการเข้าร่วมใหม่ กรุณาโหลดหน้านี้ใหม่';renderLobby();return;}applyLobby(state);}catch{}};
+ socket.onclose=e=>{renderLobby();if(removedByAdmin||e.code===4000&&e.reason==='removed-by-admin'){lobbyNotice='Admin นำคุณออกจากห้องรอแล้ว หากต้องการเข้าร่วมใหม่ กรุณาโหลดหน้านี้ใหม่';renderLobbyClock();return;}if(e.code===4000){lobbyNotice='เปิดเกมอยู่ในหน้าจออื่น กรุณาโหลดหน้านี้ใหม่หากต้องการเล่นที่นี่';renderLobbyClock();return;}lobbyNotice='การเชื่อมต่อสะดุด กำลังเข้าห้องรอใหม่…';renderLobbyClock();setTimeout(connectLobby,reconnectDelay);reconnectDelay=Math.min(15000,reconnectDelay*2);};
 }
 function applyLobby(state){
  clockOffset=Math.max(clockOffset,state.serverNow-Date.now());lobbyNotice='';
@@ -127,7 +128,7 @@ function renderRoundTop(){
 }
 function renderLobby(){
  if(!lobby)return;
- const waiting=lobby.phase==='waiting',connected=socket?.readyState===1;
+ const waiting=lobby.phase==='waiting',connected=!removedByAdmin&&socket?.readyState===1;
  $('lobby').hidden=false;$('lobbyCount').textContent='ในห้อง '+lobby.count+' คน · พร้อมแล้ว '+lobby.readyCount+' คน';
  $('lobbyPlayers').replaceChildren();
  for(const player of lobby.players){const li=document.createElement('li');li.className=player.ready?'ready':'';const name=document.createElement('span'),mark=document.createElement('b');name.textContent=player.name+(player.me?' (คุณ)':'');mark.textContent=player.ready?'✓ พร้อม':'รอกดพร้อม';li.append(name,mark);$('lobbyPlayers').append(li);}

@@ -497,8 +497,9 @@ test('lobby runs in workerd: admin starts an all-ready shared round and only its
  const start=(f,roundId)=>mf.dispatchFetch(origin+'/api/orders/start',{method:'POST',headers:{Cookie:`mk_session=${f.token}`,Origin:origin,'X-CSRF-Token':f.csrf,'Content-Type':'application/json'},body:JSON.stringify({rulesVersion:3,roundId})});
  assert.equal((await mf.dispatchFetch(origin+'/api/lobby/ws',{headers:{Upgrade:'websocket',Origin:'https://evil.test',Cookie:`mk_session=${a.token}`}})).status,403,'a cross-site page cannot open a player socket');
  assert.equal((await mf.dispatchFetch(origin+'/api/lobby/ws',{headers:{Upgrade:'websocket',Origin:origin}})).status,401);
- const first=await connect(a),second=await connect(b);
- await until(first,s=>s.count===2);assert.ok(!JSON.stringify(first.states).includes('0812345678'),'contact numbers never reach the lobby');
+ await DB.prepare('UPDATE users SET name=? WHERE id=?').bind('Waiting outsider',outsider.id).run();
+ const first=await connect(a),second=await connect(b),third=await connect(outsider);
+ await until(first,s=>s.count===3);assert.ok(!JSON.stringify(first.states).includes('0812345678'),'contact numbers never reach the lobby');
  first.ws.send(JSON.stringify({type:'ready',ready:true}));await until(second,s=>s.readyCount===1);assert.equal(second.states.at(-1).phase,'waiting');
  const adminStart=(key='live-board-test',requestOrigin=origin)=>mf.dispatchFetch(origin+'/api/admin/start',{method:'POST',headers:{Origin:requestOrigin,'X-Admin-Key':key}});
  assert.equal((await adminStart('wrong')).status,401);
@@ -506,7 +507,15 @@ test('lobby runs in workerd: admin starts an all-ready shared round and only its
  assert.equal((await adminStart()).status,409,'cannot start with an unready player');
  second.ws.send(JSON.stringify({type:'ready',ready:true}));
  await until(first,s=>s.readyCount===2);assert.equal(first.states.at(-1).phase,'waiting');
- const readyStatus=await (await mf.dispatchFetch(origin+'/api/admin/live',{headers:{'X-Admin-Key':'live-board-test'}})).json();assert.equal(readyStatus.canStart,true);
+ const readyStatus=await (await mf.dispatchFetch(origin+'/api/admin/live',{headers:{'X-Admin-Key':'live-board-test'}})).json();assert.equal(readyStatus.canStart,false);
+ const remove=(playerId,key='live-board-test',requestOrigin=origin)=>mf.dispatchFetch(origin+'/api/admin/remove-player',{method:'POST',headers:{Origin:requestOrigin,'X-Admin-Key':key,'Content-Type':'application/json'},body:JSON.stringify({playerId})});
+ const unready=readyStatus.players.find(p=>p.name==='Waiting outsider'),readyPlayer=readyStatus.players.find(p=>p.ready);
+ assert.equal((await remove(unready.id,'wrong')).status,401);assert.equal((await remove(unready.id,'live-board-test','https://evil.test')).status,403);
+ assert.equal((await remove(readyPlayer.id)).status,409);assert.equal((await remove('bad-id')).status,400);
+ assert.equal((await remove(unready.id)).status,200);await until(first,s=>s.count===2&&s.readyCount===2);
+ await until(third,s=>s.removed===true);third.ws.close();
+ const afterRemoval=await (await mf.dispatchFetch(origin+'/api/admin/live',{headers:{'X-Admin-Key':'live-board-test'}})).json();assert.equal(afterRemoval.canStart,true);
+
  const starts=await Promise.all([adminStart(),adminStart()]);assert.deepEqual(starts.map(r=>r.status).sort(),[200,409]);assert.equal((await adminStart()).status,409);
  const roundA=await until(first,s=>s.phase==='round'),roundB=await until(second,s=>s.phase==='round');
  assert.equal(roundA.roundId,roundB.roundId);assert.equal(roundA.startAt,roundB.startAt);assert.equal(roundA.you.inRound,true);

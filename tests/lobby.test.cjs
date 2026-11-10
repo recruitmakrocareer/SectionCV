@@ -19,7 +19,7 @@ async function room() {
   const join = (userId) => {
     let attachment = { userId, name: userId, ready: false };
     const ws = { readyState: 1, messages: [], deserializeAttachment: () => attachment,
-      serializeAttachment: (value) => { attachment = value; }, send: (text) => ws.messages.push(JSON.parse(text)) };
+      serializeAttachment: (value) => { attachment = value; }, close: (code, reason) => { ws.closed = { code, reason }; }, send: (text) => ws.messages.push(JSON.parse(text)) };
     sockets.push(ws);
     return ws;
   };
@@ -117,7 +117,9 @@ test('the admin status snapshot lists the room without user ids', async () => {
   assert.equal(status.phase, 'waiting');
   assert.equal(status.count, 2);
   assert.equal(status.readyCount, 1);
-  assert.deepEqual(status.players, [{ name: 'a', ready: true }, { name: 'b', ready: false }]);
+  assert.deepEqual(status.players.map(({name,ready})=>({name,ready})), [{ name: 'a', ready: true }, { name: 'b', ready: false }]);
+  assert.ok(status.players.every(p=>/^[\w-]{36}$/.test(p.id)));
+  assert.equal(status.players[0].canRemove,false);assert.equal(status.players[1].canRemove,true);
   assert.ok(!JSON.stringify(status).includes('userId'));
 });
 test('admin start rechecks cancelled readiness, new arrivals and disconnected players',async()=>{
@@ -140,4 +142,22 @@ test('admin can start one ready player but cannot start an empty or unready room
  await ready(a);assert.equal(last(a).phase,'waiting');assert.equal((await status()).canStart,true);
  assert.equal((await start()).status,200);assert.equal(last(a).phase,'round');assert.equal(last(a).you.inRound,true);
  assert.deepEqual(lobby.state.round.players,['solo']);
+});
+
+
+test('admin removes only unready waiting players and excludes closing sockets immediately',async()=>{
+ const {lobby,join,ready,start,last}=await room();const a=join('a'),b=join('b');
+ for(const ws of [a,b])ws.serializeAttachment({...ws.deserializeAttachment(),name:'Same name'});
+ await ready(a);
+ const status=async()=>await (await lobby.fetch(new Request('https://lobby/status'))).json();
+ const remove=playerId=>lobby.fetch(new Request('https://lobby/remove',{method:'POST',body:JSON.stringify({playerId})}));
+ const players=(await status()).players;assert.notEqual(players[0].id,players[1].id);
+ assert.equal((await remove(players[0].id)).status,409,'cannot remove ready players');
+ await ready(b);assert.equal((await remove(players[1].id)).status,409,'readiness is checked again at click time');await ready(b,false);
+ assert.equal((await remove(players[1].id)).status,200);
+ assert.deepEqual(b.closed,{code:4000,reason:'removed-by-admin'});assert.equal(b.readyState,1,'test keeps close handshake pending');
+ assert.equal((await status()).count,1);assert.equal((await status()).canStart,true);assert.equal(last(a).count,1);
+ await ready(b);assert.equal(b.deserializeAttachment().ready,false,'removed sockets cannot ready up again');
+ assert.equal((await remove(players[1].id)).status,404);assert.equal((await start()).status,200);
+ assert.equal((await remove(players[0].id)).status,409,'cannot remove during a round');
 });

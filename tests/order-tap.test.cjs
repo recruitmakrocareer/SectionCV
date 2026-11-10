@@ -58,3 +58,16 @@ test('rapid taps update immediately, batch behind a slow response, and retry wit
  replies[1].fail();await wait(()=>!w.document.getElementById('retryTap').hidden);w.document.getElementById('retryTap').click();await wait(()=>requests.length===3);assert.deepEqual(requests[1],requests[2]);
  replies[2].ok();await wait(()=>w.document.getElementById('score').textContent==='100');assert.equal(run.orders,1);assert.ok(positions().every((id,i)=>id!==before[i]));
 });
+
+test('admin removal stops automatic reconnect and explains how to rejoin',async t=>{
+ const dom=new JSDOM(fs.readFileSync(path.join(__dirname,'../order-game/index.html'),'utf8'),{url:'https://game.test/order-game/',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;w.AbortSignal=AbortSignal;w.scrollTo=()=>{};
+ const scheduled=[];w.setTimeout=(fn,delay)=>{scheduled.push({fn,delay});return 1;};
+ w.fetch=async url=>Response.json(url.includes('api/session')?{user:{name:'Player'},csrf:'test'}:{entries:[],total:0,page:1,day:'2026-11-10'});
+ let socket;w.WebSocket=class{constructor(){socket=this;this.readyState=1;}send(){}};
+ w.eval(fs.readFileSync(path.join(__dirname,'../order-game/game.js'),'utf8'));for(let i=0;i<30&&!socket?.onmessage;i++)await new Promise(r=>setTimeout(r,5));
+ socket.onmessage({data:JSON.stringify({serverNow:Date.now(),phase:'waiting',count:1,readyCount:0,players:[],you:{ready:false,inRound:false},lastRound:null})});
+ socket.onmessage({data:JSON.stringify({removed:true,serverNow:Date.now(),phase:'waiting',count:0,readyCount:0,players:[],you:{ready:false,inRound:false},lastRound:null})});
+ assert.equal(w.document.getElementById('start').disabled,true,'removal notice blocks play before close handshake finishes');
+ socket.readyState=3;socket.onclose({code:1006,reason:''});
+ assert.match(w.document.getElementById('lobbyStatus').textContent,/Admin.*นำคุณออก/);assert.equal(w.document.getElementById('start').disabled,true);assert.equal(scheduled.length,0,'no reconnect timer after admin removal');
+});
