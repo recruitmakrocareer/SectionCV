@@ -12,7 +12,7 @@
       content="แตะให้ไว จัดให้ครบ! เกมจัดออเดอร์ 90 วินาที แข่งกับเพื่อน ทำคอมโบ และขึ้นอันดับประจำวัน"
     />
     <title>Order Rush — แตะให้ไว จัดให้ครบ! | makro</title>
-    <link rel="stylesheet" href="style.css?v=20" />
+    <link rel="stylesheet" href="style.css?v=21" />
   </head>
   <body>
     <header>
@@ -97,6 +97,15 @@
           </div>
           <small id="guestHint">ใช้ชื่อ 2–30 ตัวอักษร แล้วไปสนุกด้วยกัน</small>
           <p id="guestStatus" class="small" role="status"></p>
+        </form>
+        <form id="nameForm" class="guest-form" hidden>
+          <label for="roundName">ชื่อสำหรับรอบนี้</label>
+          <div class="join-row">
+            <input id="roundName" minlength="2" maxlength="30" autocomplete="nickname" required aria-describedby="roundNameHint" />
+            <button id="saveName" class="primary" type="submit" disabled>บันทึกชื่อ</button>
+          </div>
+          <small id="roundNameHint">เปลี่ยนชื่อได้ก่อนกดพร้อมในแต่ละรอบ · ใช้ชื่อ 2–30 ตัวอักษร</small>
+          <p id="nameStatus" class="small" role="status"></p>
         </form>
         <div id="lobby" class="lobby" hidden>
           <div class="lobby-heading">
@@ -216,6 +225,6 @@
         ><a href="../">เลือกเกมอื่น</a>
       </div>
     </dialog>
-    <script src="game.js?v=20"></script>
+    <script src="game.js?v=21"></script>
   </body>
 </html>

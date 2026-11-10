@@ -25,6 +25,22 @@ export class LobbyRoom {
 
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === '/rename' && request.method === 'POST') {
+      const { userId, name } = await request.json();
+      return this.ctx.blockConcurrencyWhile(async () => {
+        const sockets = this.sockets().filter(ws => ws.deserializeAttachment().userId === userId);
+        if (this.state.phase !== 'waiting' || !sockets.length || sockets.some(ws => ws.deserializeAttachment().ready)) {
+          return Response.json({ error: 'เปลี่ยนชื่อได้ในห้องรอก่อนกดเตรียมพร้อมเท่านั้น' }, { status: 409 });
+        }
+        try {
+          const updated = await this.env.DB.prepare('UPDATE users SET name=? WHERE id=? RETURNING name').bind(name, userId).first();
+          if (!updated) return Response.json({ error: 'ไม่พบผู้เล่น' }, { status: 404 });
+          for (const ws of sockets) ws.serializeAttachment({ ...ws.deserializeAttachment(), name: updated.name });
+          this.broadcast();
+          return Response.json({ name: updated.name });
+        } catch { return Response.json({ error: 'บันทึกชื่อไม่สำเร็จ กรุณาลองอีกครั้ง' }, { status: 503 }); }
+      });
+    }
     if (url.pathname === '/remove' && request.method === 'POST') {
       if (this.state.phase !== 'waiting') return Response.json({ error: 'นำผู้เล่นออกได้เฉพาะตอนอยู่ห้องรอ' }, { status: 409 });
       const { playerId } = await request.json();
