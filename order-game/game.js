@@ -84,9 +84,16 @@ products.forEach(([emoji,name,variant],i)=>{
 });
 async function load(){
  $('start').disabled=true;$('retryLogin').hidden=true;
- try{const r=await fetch('../api/session',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const s=await r.json();if(!s.user){$('identity').textContent='เชื่อมต่อ LINE ที่หน้าแรกก่อนเล่น';$('login').hidden=false;$('start').textContent='กรุณาเชื่อมต่อ LINE';return;}csrf=s.csrf;$('identity').textContent='ผู้เล่น: '+(s.user.name||s.user.lineName);$('start').textContent='กำลังเข้าห้องรอ…';$('lobbyTops').hidden=false;connectLobby();await board();}catch{$('identity').textContent='โหลดบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง';$('retryLogin').hidden=false;}
+ try{const r=await fetch('../api/session',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const s=await r.json();if(!s.user){$('identity').textContent='ตั้งชื่อแล้วเข้าห้องรอได้เลย ไม่ต้องเชื่อมต่อ LINE';$('guestForm').hidden=false;$('start').hidden=true;$('guestName').focus();return;}$('guestForm').hidden=true;$('start').hidden=false;csrf=s.csrf;$('identity').textContent='ผู้เล่น: '+(s.user.name||s.user.lineName);$('start').textContent='กำลังเข้าห้องรอ…';$('lobbyTops').hidden=false;connectLobby();await board();}catch{$('identity').textContent='โหลดบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง';$('retryLogin').hidden=false;}
 }
 $('retryLogin').onclick=load;
+$('guestForm').onsubmit=async e=>{
+ e.preventDefault();const name=$('guestName').value.trim();if(name.length<2){$('guestStatus').textContent='กรุณาตั้งชื่ออย่างน้อย 2 ตัวอักษร';return;}
+ $('guestJoin').disabled=true;$('guestStatus').textContent='กำลังเข้าห้องรอ…';
+ try{const r=await fetch('../api/guest',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({name}),signal:AbortSignal.timeout(12000)});let v;try{v=await r.json();}catch{throw Error('เชื่อมต่อไม่สำเร็จ');}if(!r.ok)throw Error(v.error||'เชื่อมต่อไม่สำเร็จ');$('guestStatus').textContent='';await load();}
+ catch(err){$('guestStatus').textContent=err.message+' กรุณาลองอีกครั้ง';}
+ finally{$('guestJoin').disabled=false;}
+};
 // The server owns the clock. The largest offset seen has the least network
 // delay in it, and never makes this screen run ahead of the server.
 const serverNow=()=>Date.now()+clockOffset;
