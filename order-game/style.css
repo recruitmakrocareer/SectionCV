@@ -2089,3 +2089,72 @@ body.playing #send:disabled { opacity: .65; }
 body.playing #feedback { color: #e0eaff; }
 body.playing .pick-badge { background: #236d48; }
 @media (max-width: 700px) { body.playing .shelf { padding: 6px; } }
+
+/* The interactive products live inside the illustrated truck's cargo bay. */
+.brand img { display: block; width: 66px; height: 48px; object-fit: contain; }
+body.playing { background: #fff3dd; color: #283a4b; }
+body.playing header { background: #fffdf7; border-bottom-color: #d71935; }
+body.playing header a { color: #31435e; }
+body.playing header .brand { background: #fff; padding: 0 8px; border-radius: 8px; }
+body.playing header .brand img { height: 42px; width: 58px; }
+body.playing .shelf-title { color: #5b3940; }
+body.playing .shelf-title small { color: #6c5260; }
+body.playing #play { grid-template-rows: auto auto 26px minmax(420px, 1fr); }
+body.playing { height: auto; overflow: auto; }
+body.playing main { height: auto; min-height: calc(100dvh - 52px); }
+.truck-shop {
+  grid-column: 1; grid-row: 4; position: relative; min-height: 460px;
+  background: #ffe9c5 url('art/makro-truck.webp') center / 100% 100% no-repeat;
+  border: 2px solid #e5b98b; border-radius: 20px;
+  box-shadow: 0 5px 0 #e7c7a0; overflow: hidden;
+}
+body.playing .truck-shop .shelf {
+  position: absolute; inset: 29% 9% 29% 28%;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0; padding: 0; border: 3px solid #fff9e8; border-radius: 7px;
+  background: #e8ddca; box-shadow: inset 0 4px 14px #5c3b3522;
+}
+body.playing .truck-shop .product {
+  border: 0; border-radius: 0; border-right: 3px solid #fffdf3;
+  border-bottom: 9px solid #fffdf3;
+  background: linear-gradient(#fff8e780, #ddc9a580); box-shadow: 0 3px 0 #a78d6c;
+  padding: 4px 3px; gap: 2px; min-width: 0;
+}
+body.playing .truck-shop .product:hover:not(:disabled) { background: #fff4b8; transform: none; }
+body.playing .truck-shop .product.selected { background: #e2f2cf; box-shadow: inset 0 0 0 3px #5fa56b; }
+body.playing .truck-shop .product.expired { background: #f8d9d6; }
+body.playing .truck-shop .product-art { min-height: 0; border-radius: 0; }
+body.playing .truck-shop .product-name { font-size: 12px; }
+body.playing .truck-shop .product small { font-size: 10px; padding: 2px 3px; background: #fffefa; }
+body.playing .truck-shop .product.expired small { background: #9d2f43; color: white; }
+@media (min-width: 1100px) {
+  body.playing main { max-width: 1440px; }
+  .truck-shop { min-height: 540px; }
+}
+@media (max-width: 700px) {
+  body.playing #play { grid-template-columns: minmax(0, 1fr) 126px; grid-template-rows: auto auto 24px minmax(620px, 1fr); }
+  .truck-shop { min-height: 620px; background-size: auto 100%; background-position: 82% center; }
+  body.playing .truck-shop .shelf {
+    inset: 29% 6% 29% 6%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+  }
+  body.playing .truck-shop .product { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto auto; }
+  body.playing .truck-shop .product-art { grid-column: 1; grid-row: 1; max-height: none; }
+  body.playing .truck-shop .product-name { font-size: 11px; align-self: center; }
+  body.playing .truck-shop .product small { align-self: center; font-size: 9px; }
+}
+/* On phones show the whole truck, then the basket underneath. */
+@media (max-width: 700px) {
+  body.playing #play { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 24px 360px auto; }
+  body.playing .truck-shop { grid-column: 1; grid-row: 4; min-height: 0; background-size: 100% 100%; background-position: center; }
+  body.playing .truck-shop .shelf { inset: 29% 9% 29% 28%; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+  body.playing .truck-shop .product-name { font-size: 10px; }
+  body.playing .truck-shop .product small { font-size: 9px; padding: 1px; }
+  body.playing .basket { grid-column: 1; grid-row: 5; min-height: 260px; display: grid; grid-template-columns: 105px minmax(0,1fr); grid-template-rows: auto minmax(90px,1fr) auto auto; }
+  body.playing .basket .ticket-head { grid-column: 1/-1; }
+  body.playing .cart-art { grid-column: 1; grid-row: 2; height: 90px; display: block; }
+  body.playing .basket-items { grid-column: 2; grid-row: 2; }
+  body.playing #send, body.playing #feedback { grid-column: 1/-1; }
+}
