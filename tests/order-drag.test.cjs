@@ -1,8 +1,10 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const {JSDOM}=require('jsdom');const fs=require('node:fs');const path=require('node:path');
 test('pointer drop adds one product, ignores outside drops, and preserves tap selection',async t=>{
  const d=new JSDOM(fs.readFileSync(path.join(__dirname,'../order-game/index.html'),'utf8'),{url:'https://game.test/order-game/',runScripts:'outside-only'});t.after(()=>d.window.close());const w=d.window;w.AbortSignal=AbortSignal;w.scrollTo=()=>{};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
- w.fetch=async url=>Response.json(url.includes('api/session')?{user:{name:'Test'},csrf:'test'}:url.includes('/start')?{id:'test',day:'2026-09-14',remaining:90000,score:0,combo:0,orders:0,best:0,errors:0,seq:0,complete:false,order:[1,0,1,0,0,0,0,0]}:{entries:[],total:0,page:1,day:'2026-09-14'});
- w.eval(fs.readFileSync(path.join(__dirname,'../order-game/game.js'),'utf8'));await new Promise(r=>setTimeout(r,10));w.document.getElementById('start').click();await new Promise(r=>setTimeout(r,10));
+ w.fetch=async url=>Response.json(url.includes('api/session')?{user:{name:'Test'},csrf:'test'}:url.includes('/start')?{id:'test',day:'2026-09-14',remaining:90000,deadline:Date.now()+90000,score:0,combo:0,orders:0,best:0,errors:0,seq:0,complete:false,order:[1,0,1,0,0,0,0,0]}:{entries:[],total:0,page:1,day:'2026-09-14'});
+ let socket;w.WebSocket=class{constructor(){socket=this;this.readyState=1;}send(){}};
+ w.eval(fs.readFileSync(path.join(__dirname,'../order-game/game.js'),'utf8'));await new Promise(r=>setTimeout(r,10));
+ const now=Date.now();socket.onmessage({data:JSON.stringify({type:'state',serverNow:now,phase:'round',readyDeadline:null,count:1,readyCount:1,players:[],roundId:'test-round',startAt:now,endAt:now+90000,you:{ready:true,inRound:true},lastRound:null})});await new Promise(r=>setTimeout(r,30));
  assert.ok(w.document.body.classList.contains('playing'));
  w.document.getElementById('dropBasket').getBoundingClientRect=()=>({left:0,right:300,top:300,bottom:400});const cards=w.document.querySelectorAll('.product');
  const pointer=(node,type,x,y)=>node.dispatchEvent(new w.MouseEvent(type,{bubbles:true,clientX:x,clientY:y,button:0}));

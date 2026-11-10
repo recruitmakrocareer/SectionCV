@@ -34,14 +34,16 @@ export async function orderAPI(db,user,path,data,now){
  }
  if(path==='/api/orders/start'){
   if(data.rulesVersion!==3)bad('กติกาเปลี่ยนแล้ว กรุณาปิดและเปิดเกมใหม่',409);
-  const active=await q('SELECT * FROM order_runs_v3 WHERE user_id=? AND complete=0 ORDER BY started DESC LIMIT 1',user.id).first();
-  if(active&&active.deadline>now)return view(active,now);
-  if(active)await q('UPDATE order_runs_v3 SET complete=1 WHERE id=?',active.id).run();
-  const recent=await q('SELECT COUNT(*) AS n FROM order_runs_v3 WHERE user_id=? AND started>?',user.id,now-60000).first();if(recent.n>=5)bad('เริ่มบ่อยเกินไป กรุณารอสักครู่',429);
+  const round=data.round;if(!round)bad('กรุณาเข้าห้องรอเพื่อเริ่มพร้อมผู้เล่นคนอื่น',409);
+  // One deterministic run per player per round: retries and reloads resume it,
+  // and the lobby can find every score in the round from the id prefix.
+  const id=`round:${round.id}:${user.id}`;
+  const existing=await q('SELECT * FROM order_runs_v3 WHERE id=? AND user_id=?',id,user.id).first();if(existing)return view(existing,now);
+  await q('UPDATE order_runs_v3 SET complete=1 WHERE user_id=? AND complete=0',user.id).run();
   // The partial unique index serializes concurrent start requests.
   await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_order_v3_active ON order_runs_v3(user_id) WHERE complete=0').run();
-  await q('INSERT OR IGNORE INTO order_runs_v3(id,user_id,day,started,deadline,updated,order_started) VALUES(?,?,?,?,?,?,?)',crypto.randomUUID(),user.id,dayOf(now),now,now+90000,now,now).run();
-  return view(await q('SELECT * FROM order_runs_v3 WHERE user_id=? AND complete=0',user.id).first(),now);
+  await q('INSERT OR IGNORE INTO order_runs_v3(id,user_id,day,started,deadline,updated,order_started) VALUES(?,?,?,?,?,?,?)',id,user.id,dayOf(round.startAt),round.startAt,round.endAt,round.startAt,round.startAt).run();
+  return view(await q('SELECT * FROM order_runs_v3 WHERE id=? AND user_id=?',id,user.id).first(),now);
  }
  const r=await q('SELECT * FROM order_runs_v3 WHERE id=? AND user_id=?',typeof data.id==='string'?data.id:'',user.id).first();if(!r)bad('ไม่พบรอบเกม',404);
  if(path==='/api/orders/finish'){
@@ -49,6 +51,7 @@ export async function orderAPI(db,user,path,data,now){
   await q('UPDATE order_runs_v3 SET complete=1 WHERE id=?',r.id).run();return view({...r,complete:1},now);
  }
  if(path!=='/api/orders/submit')bad('ไม่พบรายการ',404);
+ if(now<r.started)bad('ยังไม่ถึงเวลาเริ่ม',409);
  const picks=data.picks;
  if(!Array.isArray(picks)||picks.length!==8||picks.some(n=>!Number.isInteger(n)||n<0||n>9)||!Number.isSafeInteger(data.seq))bad('ข้อมูลออเดอร์ไม่ถูกต้อง');
  const payload=JSON.stringify(picks);

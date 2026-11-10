@@ -19,6 +19,10 @@
     "LIFF_ID": "2011516015-Oew2KPlY",
     "APP_ORIGIN": "https://sectioncv.recruitcpaxtramakro.workers.dev"
   },
+  "durable_objects": {
+    "bindings": [{ "name": "LOBBY", "class_name": "LobbyRoom" }]
+  },
+  "migrations": [{ "tag": "lobby-v1", "new_sqlite_classes": ["LobbyRoom"] }],
   "d1_databases": [
     {
       "binding": "DB",

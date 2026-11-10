@@ -1,6 +1,7 @@
 import { orderAPI } from './order-game.mjs';
 import rules from '../server/game-rules.cjs';
 import statistics from '../server/statistics.cjs';
+export { LobbyRoom } from './lobby-room.mjs';
 
 const { advanceRun, runResult, newProgress, sprintProgress, PENALTY_MS, SPRINT_MS, fail } = rules;
 const { boardSQL, rankSQL, summarySQL, historySQL, board90SQL, rank90SQL, me90SQL, totals90SQL, summary90SQL, boardPage, board90View } = statistics;
@@ -48,6 +49,8 @@ async function readBody(request) {
 }
 
 function securityHeaders(response, secure) {
+  // A 101 response cannot be rebuilt; it must reach the runtime unchanged.
+  if (response.webSocket) return response;
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', 'no-store');
   headers.set('X-Content-Type-Options', 'nosniff');
@@ -203,6 +206,18 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           const user = await session(false);
           return json({ lineReady, csrf: user?.csrf || '', user: user ? userView(user) : null, penaltyMs: PENALTY_MS, ...(lineReady && env.LIFF_ID ? { liffId: env.LIFF_ID } : {}) });
         }
+        const lobby = () => {
+          if (!env.LOBBY) fail('ห้องรอยังไม่เปิดใช้งาน', 503);
+          return env.LOBBY.get(env.LOBBY.idFromName('order-rush'));
+        };
+        if (request.method === 'GET' && url.pathname === '/api/lobby/ws') {
+          const user = await session();
+          // Browsers do not apply same-origin rules to WebSockets; check here.
+          if (!origin || url.origin !== origin || request.headers.get('Origin') !== origin) fail('คำขอไม่ถูกต้อง กรุณาโหลดหน้าใหม่', 403);
+          if (request.headers.get('Upgrade') !== 'websocket') fail('ต้องเชื่อมต่อแบบ WebSocket', 426);
+          return lobby().fetch('https://lobby/ws', { headers: { Upgrade: 'websocket', 'X-Lobby-User': user.id,
+            'X-Lobby-Name': encodeURIComponent(String(user.name || user.line_name).slice(0, 80)) } });
+        }
         if (request.method === 'GET' && url.pathname === '/api/orders/board') return json(await orderAPI(db, await session(), url.pathname, Object.fromEntries(url.searchParams), now()));
         if (request.method === 'GET' && url.pathname === '/api/leaderboard') {
           if (url.searchParams.get('rulesVersion') === '2') {
@@ -247,7 +262,14 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           const user = await session();
           if (!origin || url.origin !== origin || request.headers.get('Origin') !== origin || !equal(request.headers.get('X-CSRF-Token'), user.csrf)) fail('คำขอไม่ถูกต้อง กรุณาโหลดหน้าใหม่', 403);
           const data = await readBody(request);
-          if (['/api/orders/start','/api/orders/submit','/api/orders/finish'].includes(url.pathname)) return json(await orderAPI(db, user, url.pathname, data, now()));
+          if (url.pathname === '/api/orders/start') {
+            // Only the lobby can admit a player, so nobody can start a ranked run alone.
+            if (typeof data.roundId !== 'string' || !/^[\w-]{36}$/.test(data.roundId)) fail('กรุณาเข้าห้องรอเพื่อเริ่มพร้อมผู้เล่นคนอื่น', 409);
+            const admitted = await lobby().fetch(`https://lobby/round?id=${data.roundId}&user=${encodeURIComponent(user.id)}`);
+            if (!admitted.ok) fail('คุณไม่ได้อยู่ในรอบนี้ กรุณารอรอบถัดไป', 409);
+            return json(await orderAPI(db, user, url.pathname, { ...data, round: await admitted.json() }, now()));
+          }
+          if (['/api/orders/submit','/api/orders/finish'].includes(url.pathname)) return json(await orderAPI(db, user, url.pathname, data, now()));
           if (url.pathname === '/api/logout') {
             await stmt('DELETE FROM sessions WHERE token_hash=?', user.token_hash).run();
             return json({ ok: true }, 200, { 'Set-Cookie': cookie('mk_session', '', 0) });
