@@ -1999,12 +1999,8 @@ body.playing .pressure-line { font-size: 13px; color: #4c6044; }
 
 /* Arcade warehouse: navy control panels, green field, gold primary action. */
 body.playing {
-  --ink: #f4f7ff;
-  --muted: #bccbea;
-  --line: #416cc0;
-  --green: #74eba1;
   background: #0c1634;
-  color: var(--ink);
+  color: #f4f7ff;
 }
 body.playing header {
   background: #172957;
