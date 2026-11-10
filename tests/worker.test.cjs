@@ -487,7 +487,7 @@ test('order rush client plays through D1, retries a lost submit and displays con
  await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id=?').bind(f.id).run();
 });
 
-test('lobby runs in workerd: all ready starts one shared round and only its players can join', async t => {
+test('lobby runs in workerd: admin starts an all-ready shared round and only its players can join', async t => {
  const a=await fixture(t),b=await fixture(t),outsider=await fixture(t);
  const connect=async f=>{
   const response=await mf.dispatchFetch(origin+'/api/lobby/ws',{headers:{Upgrade:'websocket',Origin:origin,Cookie:`mk_session=${f.token}`}});
@@ -500,7 +500,14 @@ test('lobby runs in workerd: all ready starts one shared round and only its play
  const first=await connect(a),second=await connect(b);
  await until(first,s=>s.count===2);assert.ok(!JSON.stringify(first.states).includes('0812345678'),'contact numbers never reach the lobby');
  first.ws.send(JSON.stringify({type:'ready',ready:true}));await until(second,s=>s.readyCount===1);assert.equal(second.states.at(-1).phase,'waiting');
+ const adminStart=(key='live-board-test',requestOrigin=origin)=>mf.dispatchFetch(origin+'/api/admin/start',{method:'POST',headers:{Origin:requestOrigin,'X-Admin-Key':key}});
+ assert.equal((await adminStart('wrong')).status,401);
+ assert.equal((await adminStart('live-board-test','https://evil.test')).status,403);
+ assert.equal((await adminStart()).status,409,'cannot start with an unready player');
  second.ws.send(JSON.stringify({type:'ready',ready:true}));
+ await until(first,s=>s.readyCount===2);assert.equal(first.states.at(-1).phase,'waiting');
+ const readyStatus=await (await mf.dispatchFetch(origin+'/api/admin/live',{headers:{'X-Admin-Key':'live-board-test'}})).json();assert.equal(readyStatus.canStart,true);
+ const starts=await Promise.all([adminStart(),adminStart()]);assert.deepEqual(starts.map(r=>r.status).sort(),[200,409]);assert.equal((await adminStart()).status,409);
  const roundA=await until(first,s=>s.phase==='round'),roundB=await until(second,s=>s.phase==='round');
  assert.equal(roundA.roundId,roundB.roundId);assert.equal(roundA.startAt,roundB.startAt);assert.equal(roundA.you.inRound,true);
  const run=await start(a,roundA.roundId);assert.equal(run.status,200);const body=await run.json();assert.ok(body.id.startsWith(`round:${roundA.roundId}:`));assert.equal(body.deadline,roundA.endAt);

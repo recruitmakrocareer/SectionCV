@@ -124,7 +124,7 @@ function renderLobbyClock(){
  if(!lobby)return;
  let status,clock='';const seconds=at=>Math.max(0,Math.ceil((fromServer(at)-Date.now())/1000));
  if(lobbyNotice)status=lobbyNotice;
- else if(lobby.phase==='waiting')status=lobby.count<2?'รอผู้เล่นอย่างน้อย 2 คน และกดพร้อมให้ครบทุกคน':'รอทุกคนกดเตรียมพร้อม ('+lobby.readyCount+'/'+lobby.count+')';
+ else if(lobby.phase==='waiting')status=lobby.count<2?'รอผู้เล่นอย่างน้อย 2 คน และกดพร้อมให้ครบทุกคน':lobby.readyCount===lobby.count?'พร้อมครบแล้ว รอ Admin กดเริ่มเกม':'รอทุกคนกดเตรียมพร้อม ('+lobby.readyCount+'/'+lobby.count+')';
  else if(Date.now()<fromServer(lobby.startAt)){status=lobby.you.inRound?'เกมกำลังจะเริ่ม!':'รอบนี้กำลังจะเริ่ม รอรอบถัดไปนะ';clock=String(seconds(lobby.startAt));}
  else{status=lobby.you.inRound?'รอผู้เล่นคนอื่นจบรอบ':'รอบนี้กำลังแข่งอยู่ รอรอบถัดไปนะ';clock='เหลือ '+seconds(lobby.endAt)+' วินาที';}
  if($('lobbyStatus').textContent!==status)$('lobbyStatus').textContent=status;$('lobbyClock').textContent=clock;
