@@ -27,8 +27,8 @@ export class LobbyRoom {
     const url = new URL(request.url);
     if (url.pathname === '/start' && request.method === 'POST') {
       const players = this.sockets().map((ws) => ws.deserializeAttachment());
-      if (this.state.phase !== 'waiting' || players.length < 2 || !players.every((player) => player.ready)) {
-        return Response.json({ error: 'ต้องมีผู้เล่นอย่างน้อย 2 คน และทุกคนต้องกดพร้อมก่อนเริ่ม' }, { status: 409 });
+      if (this.state.phase !== 'waiting' || players.length < 1 || !players.every((player) => player.ready)) {
+        return Response.json({ error: 'ต้องมีผู้เล่นอย่างน้อย 1 คน และทุกคนต้องกดพร้อมก่อนเริ่ม' }, { status: 409 });
       }
       await this.startRound(players);
       this.broadcast();
@@ -45,7 +45,7 @@ export class LobbyRoom {
       const players = this.sockets().map((ws) => ws.deserializeAttachment());
       const { phase, round, readyDeadline, lastRound } = this.state;
       return Response.json({
-        canStart: phase === 'waiting' && players.length >= 2 && players.every((player) => player.ready),
+        canStart: phase === 'waiting' && players.length >= 1 && players.every((player) => player.ready),
         phase, readyDeadline, count: players.length, readyCount: players.filter((player) => player.ready).length,
         players: players.slice(0, MAX_LISTED).map((player) => ({ name: player.name, ready: player.ready })),
         round: round && { id: round.id, startAt: round.startAt, endAt: round.endAt, count: round.players.length },

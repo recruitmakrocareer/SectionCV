@@ -14,7 +14,7 @@ test('admin start is offered only when ready and handles stale readiness and rep
  state.canStart=true;state.readyCount=2;await intervals[0]();assert.equal(button.hidden,false);assert.equal(button.disabled,false);
  button.click();button.click();assert.equal(posts,1);assert.equal(button.disabled,true);
  state.canStart=false;state.readyCount=1;release(Response.json({error:'มีผู้เล่นยังไม่พร้อม'},{status:409}));await wait(()=>button.hidden);assert.match(w.document.getElementById('startStatus').textContent,/ยังไม่พร้อม/);
- state.canStart=true;state.readyCount=2;await intervals[0]();button.click();assert.equal(posts,2);
- state={...state,canStart:false,live:true,phase:'round',roundId:'round',round:{startAt:Date.now()+5000,endAt:Date.now()+95000,count:2}};
+ state.canStart=true;state.count=1;state.readyCount=1;await intervals[0]();assert.equal(button.hidden,false);assert.equal(button.disabled,false);button.click();assert.equal(posts,2);
+ state={...state,canStart:false,live:true,phase:'round',roundId:'round',round:{startAt:Date.now()+5000,endAt:Date.now()+95000,count:1}};
  release(Response.json({ok:true}));await wait(()=>w.document.getElementById('phase').textContent==='กำลังนับถอยหลัง');assert.equal(button.hidden,true);
 });
