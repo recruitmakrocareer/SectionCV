@@ -10,6 +10,7 @@
   let clockTimer = null;
   let inFlight = false;
   let starting = false;
+  let removing = false;
   let mutation = 0;
   try { key = sessionStorage.getItem(STORE) || ''; } catch {}
 
@@ -101,7 +102,7 @@
     $('startGame').hidden = false;
     const unreadyNames = (data.players || []).filter(player => !player.ready).slice(0, 6).map(player => player.name);
     $('startHint').textContent = data.live ? 'มีรอบกำลังเล่นอยู่ รอจบรอบก่อนเริ่มใหม่' : data.canStart ? `พร้อมครบ ${data.readyCount}/${data.count} คน · Admin กดเริ่มเกมได้เลย` : !data.count ? 'ยังไม่มีผู้เล่นในห้อง ให้ผู้เล่นเข้าเกมและกดเตรียมพร้อมก่อน' : `พร้อม ${data.readyCount}/${data.count} คน · รอทุกคนกดเตรียมพร้อม` + (unreadyNames.length ? ' · ยังไม่พร้อม: ' + unreadyNames.join(', ') : '');
-    $('startGame').disabled = starting || !data.canStart || data.live;
+    $('startGame').disabled = starting || removing || !data.canStart || data.live;
     const rows = data.scores || [];
     const leader = rows[0];
     $('leader').hidden = !leader;
@@ -131,14 +132,39 @@
     for (const player of data.players || []) {
       const li = document.createElement('li');
       if (player.ready) li.className = 'ready';
-      li.textContent = player.ready ? `✓ ${player.name}` : player.name;
+      const name = document.createElement('span');
+      name.textContent = player.ready ? `✓ ${player.name}` : player.name;
+      li.append(name);
+      if (player.canRemove && player.id && !player.ready && !data.live) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'remove-player'; button.textContent = 'นำออก';
+        button.setAttribute('aria-label', `นำ ${player.name} ออกจากห้องรอ`);
+        button.disabled = removing || starting;
+        button.onclick = () => removePlayer(player);
+        li.append(button);
+      }
       waiting.append(li);
     }
     $('updated').textContent = `อัปเดตล่าสุด ${new Date().toLocaleTimeString('th-TH')}`;
   }
 
+  async function removePlayer(player) {
+    if (removing || starting || data?.live) return;
+    removing = true; mutation++; render();
+    $('startStatus').textContent = `กำลังนำ ${player.name} ออกจากห้องรอ…`;
+    try {
+      const response = await fetch('api/admin/remove-player', { method: 'POST', headers: { 'X-Admin-Key': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: player.id }), credentials: 'same-origin', cache: 'no-store' });
+      const value = await response.json();
+      if (response.status === 401 || response.status === 503) { remember(''); showLogin(value.error); return; }
+      if (!response.ok) throw new Error(value.error || 'นำผู้เล่นออกไม่สำเร็จ');
+      $('startStatus').textContent = `นำ ${player.name} ออกจากห้องรอแล้ว`;
+    } catch (error) { $('startStatus').textContent = error.message; }
+    finally { removing = false; await poll(); }
+  }
+
   $('startGame').addEventListener('click', async () => {
-    if (starting || !data?.canStart || data.live) return;
+    if (starting || removing || !data?.canStart || data.live) return;
     starting = true;
     mutation++;
     $('startGame').disabled = true;

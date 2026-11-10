@@ -218,12 +218,16 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           return lobby().fetch('https://lobby/ws', { headers: { Upgrade: 'websocket', 'X-Lobby-User': user.id,
             'X-Lobby-Name': encodeURIComponent(String(user.name || user.line_name).slice(0, 80)) } });
         }
-        if (request.method === 'POST' && url.pathname === '/api/admin/start') {
+        if (request.method === 'POST' && ['/api/admin/start', '/api/admin/remove-player'].includes(url.pathname)) {
           if (!env.ADMIN_PASSWORD) fail('ยังไม่ได้ตั้งรหัสผ่าน admin ใน Cloudflare', 503);
           const key = request.headers.get('X-Admin-Key') || '';
           if (!equal(await hash(key), await hash(env.ADMIN_PASSWORD))) fail('รหัสผ่านไม่ถูกต้อง', 401);
           if (!origin || url.origin !== origin || request.headers.get('Origin') !== origin) fail('คำขอไม่ถูกต้อง', 403);
-          const response = await lobby().fetch(new Request('https://lobby/start', { method: 'POST' }));
+          const removing = url.pathname === '/api/admin/remove-player';
+          const data = removing ? await readBody(request) : null;
+          if (removing && (typeof data.playerId !== 'string' || !/^[\w-]{36}$/.test(data.playerId))) fail('ข้อมูลผู้เล่นไม่ถูกต้อง');
+          const response = await lobby().fetch(new Request(removing ? 'https://lobby/remove' : 'https://lobby/start', { method: 'POST',
+            ...(removing ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: data.playerId }) } : {}) }));
           return json(await response.json(), response.status);
         }
         if (request.method === 'GET' && url.pathname === '/api/admin/live') {

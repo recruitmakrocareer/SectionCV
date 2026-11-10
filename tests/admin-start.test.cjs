@@ -18,3 +18,19 @@ test('admin start stays visible, explains unready players, and enables only when
  state={...state,canStart:false,live:true,phase:'round',roundId:'round',round:{startAt:Date.now()+5000,endAt:Date.now()+95000,count:1}};
  release(Response.json({ok:true}));await wait(()=>w.document.getElementById('phase').textContent==='กำลังนับถอยหลัง');assert.equal(button.hidden,false);assert.equal(button.disabled,true);assert.match(w.document.getElementById('startHint').textContent,/กำลังเล่น/);
 });
+
+test('admin removes an unready connection and can start with the remaining ready player',async t=>{
+ const dom=new JSDOM(fs.readFileSync('live.html','utf8'),{url:'https://game.test/live.html',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;w.sessionStorage.setItem('mk_admin_key','test-only');w.setInterval=()=>1;w.clearInterval=()=>{};
+ const id='00000000-0000-4000-8000-000000000001';let removed=false,calls=0,release;
+ w.fetch=async(url,options)=>{
+  assert.equal(options.headers['X-Admin-Key'],'test-only');
+  if(url.endsWith('/remove-player')){calls++;assert.equal(options.method,'POST');assert.deepEqual(JSON.parse(options.body),{playerId:id});return new Promise(resolve=>{release=()=>{removed=true;resolve(Response.json({ok:true}));};});}
+  return Response.json({serverNow:Date.now(),phase:'waiting',canStart:removed,live:false,count:removed?1:2,readyCount:1,scores:[],players:[{id:'ready',name:'Same name',ready:true,canRemove:false},...removed?[]:[{id,name:'Same name',ready:false,canRemove:true}]]});
+ };
+ const wait=async check=>{for(let i=0;i<100;i++){if(check())return;await new Promise(r=>setTimeout(r,5));}assert.fail('admin removal timeout');};
+ w.eval(fs.readFileSync('live.js','utf8'));await wait(()=>w.document.querySelectorAll('.remove-player').length===1);
+ assert.equal(w.document.getElementById('startGame').disabled,true);
+ const remove=w.document.querySelector('.remove-player');remove.click();remove.click();assert.equal(calls,1);assert.equal(w.document.querySelector('.remove-player').disabled,true);
+ release();await wait(()=>!w.document.getElementById('startGame').disabled);
+ assert.equal(w.document.querySelectorAll('.remove-player').length,0);assert.match(w.document.getElementById('startStatus').textContent,/ออกจากห้องรอแล้ว/);
+});
