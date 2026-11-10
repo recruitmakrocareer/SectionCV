@@ -56,6 +56,7 @@
       if (!response.ok) throw new Error(value.error || 'โหลดไม่สำเร็จ');
       if (version !== mutation) return;
       offset = value.serverNow - Date.now();
+      if (data?.live && !value.live) $('startStatus').textContent = '';
       data = value;
       render();
       $('conn').textContent = '';
@@ -97,7 +98,9 @@
 
   function render() {
     renderClock();
-    $('startGame').hidden = !data.canStart || data.live;
+    $('startGame').hidden = false;
+    const unreadyNames = (data.players || []).filter(player => !player.ready).slice(0, 6).map(player => player.name);
+    $('startHint').textContent = data.live ? 'มีรอบกำลังเล่นอยู่ รอจบรอบก่อนเริ่มใหม่' : data.canStart ? `พร้อมครบ ${data.readyCount}/${data.count} คน · Admin กดเริ่มเกมได้เลย` : !data.count ? 'ยังไม่มีผู้เล่นในห้อง ให้ผู้เล่นเข้าเกมและกดเตรียมพร้อมก่อน' : `พร้อม ${data.readyCount}/${data.count} คน · รอทุกคนกดเตรียมพร้อม` + (unreadyNames.length ? ' · ยังไม่พร้อม: ' + unreadyNames.join(', ') : '');
     $('startGame').disabled = starting || !data.canStart || data.live;
     const rows = data.scores || [];
     const leader = rows[0];
@@ -146,7 +149,7 @@
       if (response.status === 401 || response.status === 503) { remember(''); showLogin(value.error); return; }
       if (!response.ok) throw new Error(value.error || 'เริ่มเกมไม่สำเร็จ');
       data.canStart = false;
-      $('startGame').hidden = true;
+      $('startGame').disabled = true;
       $('startStatus').textContent = 'เริ่มนับถอยหลังแล้ว';
     } catch (error) { $('startStatus').textContent = error.message; }
     finally { starting = false; await poll(); }
