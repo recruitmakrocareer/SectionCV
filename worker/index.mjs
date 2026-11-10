@@ -310,6 +310,13 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           const user = await session();
           if (!origin || url.origin !== origin || request.headers.get('Origin') !== origin || !equal(request.headers.get('X-CSRF-Token'), user.csrf)) fail('คำขอไม่ถูกต้อง กรุณาโหลดหน้าใหม่', 403);
           const data = await readBody(request);
+          if (url.pathname === '/api/orders/name') {
+            const name = typeof data.name === 'string' ? data.name.trim().replace(/\s+/g, ' ') : '';
+            if (name.length < 2 || name.length > 30 || /[\p{Cc}\p{Cf}]/u.test(name)) fail('กรุณาตั้งชื่อ 2–30 ตัวอักษร');
+            const response = await lobby().fetch(new Request('https://lobby/rename', { method: 'POST',
+              headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, name }) }));
+            return json(await response.json(), response.status);
+          }
           if (url.pathname === '/api/orders/start') {
             // Only the lobby can admit a player, so nobody can start a ranked run alone.
             if (typeof data.roundId !== 'string' || !/^[\w-]{36}$/.test(data.roundId)) fail('กรุณาเข้าห้องรอเพื่อเริ่มพร้อมผู้เล่นคนอื่น', 409);

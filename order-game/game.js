@@ -19,6 +19,7 @@ let warnedSecond=-1,customerTimer,customerUntil=0,complaintCount=0,orderClock=0,
 let removedByAdmin=false;
 let socket=null,lobby=null,clockOffset=-Infinity,reconnectDelay=1000,lobbyNotice='',joinedRound=null,currentRound=null,beginTimer;
 let tapQueue=[],tapFailed=false;
+let currentName='',nameSaving=false;
 let csrf='',run=null,picks=Array(8).fill(0),busy=false,deadline=0,timer=null,pending=null,page=1,boardDay='',sound=false,audio;
 async function api(path,data){const r=await fetch('../api/orders/'+path,{method:data===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(12000)});let value;try{value=await r.json();}catch{throw Error('โหลดข้อมูลไม่สำเร็จ');}if(!r.ok)throw Error(value.error||'เชื่อมต่อไม่สำเร็จ');return value;}
 function tone(ok){if(!sound)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.frequency.value=ok?720:190;g.gain.setValueAtTime(.07,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.12);o.start();o.stop(audio.currentTime+.13);}catch{}}
@@ -88,7 +89,7 @@ products.forEach(([emoji,name,variant],i)=>{
 });
 async function load(){
  $('start').disabled=true;$('retryLogin').hidden=true;
- try{const r=await fetch('../api/session',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const s=await r.json();if(!s.user){$('identity').textContent='ตั้งชื่อแล้วเข้าห้องรอได้เลย ไม่ต้องเชื่อมต่อ LINE';$('guestForm').hidden=false;$('start').hidden=true;$('guestName').focus({preventScroll:true});return;}$('guestForm').hidden=true;$('start').hidden=false;csrf=s.csrf;$('identity').textContent='ผู้เล่น: '+(s.user.name||s.user.lineName);$('start').textContent='กำลังเข้าห้องรอ…';$('lobbyTops').hidden=false;connectLobby();await board();}catch{$('identity').textContent='โหลดบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง';$('retryLogin').hidden=false;}
+ try{const r=await fetch('../api/session',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const s=await r.json();if(!s.user){$('identity').textContent='ตั้งชื่อแล้วเข้าห้องรอได้เลย ไม่ต้องเชื่อมต่อ LINE';$('guestForm').hidden=false;$('start').hidden=true;$('guestName').focus({preventScroll:true});return;}$('guestForm').hidden=true;$('start').hidden=false;csrf=s.csrf;currentName=s.user.name||s.user.lineName;$('roundName').value=currentName;renderNameForm();$('identity').textContent='ผู้เล่น: '+currentName;$('start').textContent='กำลังเข้าห้องรอ…';$('lobbyTops').hidden=false;connectLobby();await board();}catch{$('identity').textContent='โหลดบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง';$('retryLogin').hidden=false;}
 }
 $('retryLogin').onclick=load;
 $('guestForm').onsubmit=async e=>{
@@ -98,6 +99,24 @@ $('guestForm').onsubmit=async e=>{
  catch(err){$('guestStatus').textContent=err.message+' กรุณาลองอีกครั้ง';}
  finally{$('guestJoin').disabled=false;}
 };
+function renderNameForm(){
+ $('nameForm').hidden=!currentName;
+ const editable=lobby?.phase==='waiting'&&socket?.readyState===1&&!removedByAdmin&&!lobby.you.ready;
+ $('roundName').disabled=!editable||nameSaving;
+ $('saveName').disabled=!editable||nameSaving||$('roundName').value.trim().replace(/\s+/g,' ')===currentName;
+}
+async function saveRoundName(){
+ if(nameSaving||!lobby||lobby.phase!=='waiting'||lobby.you.ready||removedByAdmin||socket?.readyState!==1)return false;
+ const name=$('roundName').value.trim().replace(/\s+/g,' ');
+ if(name===currentName)return true;
+ if(!$('nameForm').reportValidity())return false;
+ nameSaving=true;$('nameStatus').textContent='กำลังบันทึกชื่อ…';renderLobby();
+ try{const result=await api('name',{name});currentName=result.name;$('roundName').value=currentName;$('identity').textContent='ผู้เล่น: '+currentName;$('nameStatus').textContent='บันทึกชื่อแล้ว';return true;}
+ catch(error){$('nameStatus').textContent=error.message;return false;}
+ finally{nameSaving=false;renderLobby();}
+}
+$('nameForm').onsubmit=e=>{e.preventDefault();saveRoundName();};
+$('roundName').oninput=()=>{$('nameStatus').textContent='';renderNameForm();};
 // The server owns the clock. The largest offset seen has the least network
 // delay in it, and never makes this screen run ahead of the server.
 const serverNow=()=>Date.now()+clockOffset;
@@ -128,11 +147,12 @@ function renderRoundTop(){
 }
 function renderLobby(){
  if(!lobby)return;
+ renderNameForm();
  const waiting=lobby.phase==='waiting',connected=!removedByAdmin&&socket?.readyState===1;
  $('lobby').hidden=false;$('lobbyCount').textContent='ในห้อง '+lobby.count+' คน · พร้อมแล้ว '+lobby.readyCount+' คน';
  $('lobbyPlayers').replaceChildren();
  for(const player of lobby.players){const li=document.createElement('li');li.className=player.ready?'ready':'';const name=document.createElement('span'),mark=document.createElement('b');name.textContent=player.name+(player.me?' (คุณ)':'');mark.textContent=player.ready?'✓ พร้อม':'รอกดพร้อม';li.append(name,mark);$('lobbyPlayers').append(li);}
- $('start').disabled=!waiting||!connected;$('start').textContent=!waiting?(lobby.you.inRound?'เตรียมตัว…':'รอรอบถัดไป'):lobby.you.ready?'ยกเลิกการพร้อม':'กดเตรียมพร้อม';
+ $('start').disabled=!waiting||!connected||nameSaving;$('start').textContent=!waiting?(lobby.you.inRound?'เตรียมตัว…':'รอรอบถัดไป'):lobby.you.ready?'ยกเลิกการพร้อม':'กดเตรียมพร้อม';
  $('lobbyLastWrap').hidden=!lobby.lastRound;if(lobby.lastRound)renderTop('lobbyLastRound',lobby.lastRound.top,lobby.lastRound.failed?'โหลดผลรอบล่าสุดไม่สำเร็จ':'ไม่มีคะแนนในรอบล่าสุด');
  renderLobbyClock();
 }
@@ -146,7 +166,7 @@ function renderLobbyClock(){
  if($('lobbyStatus').textContent!==status)$('lobbyStatus').textContent=status;$('lobbyClock').textContent=clock;
 }
 setInterval(renderLobbyClock,250);
-$('start').onclick=()=>{if(socket?.readyState===1&&lobby?.phase==='waiting')socket.send(JSON.stringify({type:'ready',ready:!lobby.you.ready}));};
+$('start').onclick=async()=>{if(socket?.readyState!==1||lobby?.phase!=='waiting'||removedByAdmin||nameSaving)return;if(!lobby.you.ready&&$('roundName').value.trim().replace(/\s+/g,' ')!==currentName&&!await saveRoundName())return;if(!removedByAdmin&&socket?.readyState===1&&lobby?.phase==='waiting')socket.send(JSON.stringify({type:'ready',ready:!lobby.you.ready}));};
 async function joinRound(state){
  joinedRound=state.roundId;
  for(let attempt=0;attempt<4;attempt++){
@@ -163,6 +183,7 @@ function beginPlay(state){
  orderClock=Math.max(fromServer(state.startAt),Date.now()-(run.orderElapsed||0));$('newRound').hidden=true;$('welcome').hidden=true;$('play').hidden=false;document.body.classList.add('playing');if($('result').open)$('result').close();$('feedback').textContent='แตะสินค้าให้ตรงออเดอร์ · ครบออร์เดอร์แล้วสินค้าจะสลับที่';busy=false;shuffleProducts();render();clearInterval(timer);timer=setInterval(tick,100);tick();window.scrollTo(0,0);
 }
 function backToLobby(){
+ $('roundName').value=currentName;$('nameStatus').textContent='';
  if($('result').open)$('result').close();run=null;tapQueue=[];pending=null;tapFailed=false;picks.fill(0);$('play').hidden=true;$('newRound').hidden=true;$('welcome').hidden=false;document.body.classList.remove('playing');renderLobby();window.scrollTo(0,0);
 }
 $('again').onclick=backToLobby;$('newRound').onclick=backToLobby;

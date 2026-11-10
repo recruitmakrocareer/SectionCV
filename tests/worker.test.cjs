@@ -502,7 +502,13 @@ test('lobby runs in workerd: admin starts an all-ready shared round and only its
  await DB.prepare('UPDATE users SET name=? WHERE id=?').bind('Waiting outsider',outsider.id).run();
  const first=await connect(a),second=await connect(b),third=await connect(outsider);
  await until(first,s=>s.count===3);assert.ok(!JSON.stringify(first.states).includes('0812345678'),'contact numbers never reach the lobby');
- first.ws.send(JSON.stringify({type:'ready',ready:true}));await until(second,s=>s.readyCount===1);assert.equal(second.states.at(-1).phase,'waiting');
+ const rename=(f,name,csrf=f.csrf)=>mf.dispatchFetch(origin+'/api/orders/name',{method:'POST',headers:{Cookie:`mk_session=${f.token}`,Origin:origin,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({name})});
+ assert.equal((await rename(a,'Changed','bad')).status,403);
+ assert.equal((await rename(a,'A')).status,400);assert.equal((await rename(a,'x'.repeat(31))).status,400);
+ assert.equal((await rename(a,'  New   round name  ')).status,200);
+ await until(second,s=>s.players.some(p=>p.name==='New round name'));
+ const profile=await DB.prepare('SELECT name,phone FROM users WHERE id=?').bind(a.id).first();assert.equal(profile.name,'New round name');assert.equal(profile.phone,'0812345678');
+ first.ws.send(JSON.stringify({type:'ready',ready:true}));await until(second,s=>s.readyCount===1);assert.equal(second.states.at(-1).phase,'waiting');assert.equal((await rename(a,'Too late')).status,409);
  const adminStart=(key='live-board-test',requestOrigin=origin)=>mf.dispatchFetch(origin+'/api/admin/start',{method:'POST',headers:{Origin:requestOrigin,'X-Admin-Key':key}});
  assert.equal((await adminStart('wrong')).status,401);
  assert.equal((await adminStart('live-board-test','https://evil.test')).status,403);
@@ -520,6 +526,7 @@ test('lobby runs in workerd: admin starts an all-ready shared round and only its
 
  const starts=await Promise.all([adminStart(),adminStart()]);assert.deepEqual(starts.map(r=>r.status).sort(),[200,409]);assert.equal((await adminStart()).status,409);
  const roundA=await until(first,s=>s.phase==='round'),roundB=await until(second,s=>s.phase==='round');
+ assert.equal((await rename(a,'During round')).status,409);
  assert.equal(roundA.roundId,roundB.roundId);assert.equal(roundA.startAt,roundB.startAt);assert.equal(roundA.you.inRound,true);
  const run=await start(a,roundA.roundId);assert.equal(run.status,200);const body=await run.json();assert.ok(body.id.startsWith(`round:${roundA.roundId}:`));assert.equal(body.deadline,roundA.endAt);
  assert.equal((await start(outsider,roundA.roundId)).status,409);
@@ -527,7 +534,7 @@ test('lobby runs in workerd: admin starts an all-ready shared round and only its
  assert.equal((await live()).status,401);assert.equal((await live('wrong')).status,401);
  const board=await (await live('live-board-test')).json();
  assert.equal(board.live,true);assert.equal(board.roundId,roundA.roundId);assert.equal(board.round.count,2);assert.equal(board.scores.length,1);
- assert.deepEqual(board.scores[0],{name:'ผู้เล่นทดสอบ',score:0,orders:0,errors:0,combo:0,best:0,finished:false,rank:1});
+ assert.deepEqual(board.scores[0],{name:'New round name',score:0,orders:0,errors:0,combo:0,best:0,finished:false,rank:1});
  assert.ok(!JSON.stringify(board).includes('0812345678'),'contact numbers never reach the live board');assert.ok(!JSON.stringify(board).includes(a.id),'user ids never reach the live board');
  first.ws.close();second.ws.close();
  await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id IN (?,?)').bind(a.id,b.id).run();
