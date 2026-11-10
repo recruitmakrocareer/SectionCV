@@ -24,7 +24,7 @@ main{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
 button{font:inherit;cursor:pointer;border-radius:12px}
 .primary{border:0;background:var(--red);color:#fff;font-weight:700;padding:12px 18px}
 .ghost{border:2px solid rgba(255,255,255,.6);background:transparent;color:#fff;padding:6px 12px}
-.start-control{margin:14px 0}.start-control button{min-height:52px;font-size:1.2rem;background:var(--ok)}.start-control button:disabled{opacity:.5;cursor:default}.start-control p{margin:8px 0;color:var(--red-dark)}
+.start-control{margin:14px 0}.start-control button{min-height:52px;font-size:1.2rem;background:var(--ok)}.start-control #stopGame{background:var(--red);margin-top:6px}.start-control button:disabled{opacity:.5;cursor:default}.start-control p{margin:8px 0;color:var(--red-dark)}
 .error{color:var(--red-dark);min-height:1.2em;margin:0}
 .status{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:18px 20px;border-radius:18px;background:var(--soft);border:2px solid var(--red)}
 .status h2{margin:0;font-size:1.3rem}
@@ -69,13 +69,13 @@ tr.first td{background:#fff8dc}
 </form>
 <section id="board" hidden aria-live="polite">
 <div class="status"><div><h2 id="phase">กำลังโหลด…</h2><p id="phaseNote"></p></div><div id="clock" class="clock" role="timer"></div></div>
-<div class="start-control"><button id="startGame" class="primary" type="button" disabled aria-describedby="startHint">เริ่มเกม</button><p id="startHint">กำลังตรวจสอบความพร้อม…</p><p id="startStatus" role="status"></p></div>
+<div class="start-control"><button id="startGame" class="primary" type="button" disabled aria-describedby="startHint">เริ่มเกม</button> <button id="stopGame" class="primary" type="button" hidden>หยุดเกมและสรุปคะแนน</button><p id="startHint">กำลังตรวจสอบความพร้อม…</p><p id="startStatus" role="status"></p></div>
 <div id="leader" class="leader" hidden><span class="crown" aria-hidden="true">👑</span><div><small>กำลังนำ</small><strong id="leaderName"></strong></div><span id="leaderScore" class="points"></span></div>
 <div class="table-wrap"><table><thead><tr><th>อันดับ</th><th>ผู้เล่น</th><th class="num">คะแนน</th><th class="num">ออเดอร์สำเร็จ</th><th class="num">เลือกผิด</th><th class="num">คอมโบ</th><th>สถานะ</th></tr></thead><tbody id="rows"></tbody></table><p id="empty" class="empty" hidden></p></div>
 <div class="meta"><span id="updated"></span><span id="conn" role="status"></span></div>
 <section class="waiting"><h3 id="waitingTitle">ห้องรอ</h3><ul id="waiting" class="chips"></ul></section>
 </section>
 </main>
-<script src="live.js?v=6"></script>
+<script src="live.js?v=7"></script>
 </body>
 </html>

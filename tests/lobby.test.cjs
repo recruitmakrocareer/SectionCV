@@ -161,3 +161,11 @@ test('admin removes only unready waiting players and excludes closing sockets im
  assert.equal((await remove(players[1].id)).status,404);assert.equal((await start()).status,200);
  assert.equal((await remove(players[0].id)).status,409,'cannot remove during a round');
 });
+
+test('admin stop cancels the countdown, resets readiness and clears the alarm',async()=>{
+ const {lobby,join,ready,start,last,clock}=await room();const a=join('a');await ready(a);await start();const id=lobby.state.round.id;
+ const stop=roundId=>lobby.fetch(new Request('https://lobby/stop',{method:'POST',body:JSON.stringify({roundId})}));
+ assert.equal((await stop('different')).status,409);assert.equal(last(a).phase,'round');
+ assert.equal((await stop(id)).status,200);assert.equal(last(a).phase,'waiting');assert.equal(last(a).you.ready,false);assert.equal(last(a).lastRound.stopped,true);assert.equal(clock.alarm,null);
+ assert.equal((await stop(id)).status,409);await ready(a);assert.equal((await start()).status,200);assert.notEqual(lobby.state.round.id,id);
+});

@@ -18,6 +18,7 @@ const art=['apple','apple','milk','milk','carrot','carrot','fish','fish'];
 let warnedSecond=-1,customerTimer,customerUntil=0,complaintCount=0,orderClock=0,personalBest=0;
 let removedByAdmin=false;
 let socket=null,lobby=null,clockOffset=-Infinity,reconnectDelay=1000,lobbyNotice='',joinedRound=null,currentRound=null,beginTimer;
+let adminStopped=false;
 let tapQueue=[],tapFailed=false;
 let currentName='',nameSaving=false;
 let csrf='',run=null,picks=Array(8).fill(0),busy=false,deadline=0,timer=null,pending=null,page=1,boardDay='',sound=false,audio;
@@ -30,7 +31,7 @@ function render(){
  const total=run.order.reduce((a,b)=>a+b,0),matched=picks.reduce((a,b)=>a+b,0);
  $('orderProgress').textContent='แตะถูก '+matched+'/'+total+' ชิ้น';
  $('orderItems').replaceChildren();run.order.forEach((n,i)=>{if(!n)return;const item=document.createElement('div'),label=document.createElement('span'),quantity=document.createElement('b');item.className='order-item'+(picks[i]===n?' done':'');label.textContent=products[i].join(' ');quantity.className='order-quantity';quantity.textContent=(picks[i]===n?'✓ ':'')+picks[i]+'/'+n;item.append(label,quantity);$('orderItems').append(item);});
- document.querySelectorAll('.product').forEach(b=>{const i=Number(b.dataset.product);b.disabled=run.complete||tapFailed||Date.now()>=deadline||picks.every((n,j)=>n===run.order[j]);b.classList.toggle('selected',picks[i]>0);b.querySelector('.pick-badge').textContent=picks[i]?String(picks[i]):'';b.setAttribute('aria-label','แตะ'+products[i][1]+' '+products[i][2]+' · ถูกแล้ว '+picks[i]+' จาก '+run.order[i]+' ชิ้น');});
+ document.querySelectorAll('.product').forEach(b=>{const i=Number(b.dataset.product);b.disabled=adminStopped||run.complete||tapFailed||Date.now()>=deadline||picks.every((n,j)=>n===run.order[j]);b.classList.toggle('selected',picks[i]>0);b.querySelector('.pick-badge').textContent=picks[i]?String(picks[i]):'';b.setAttribute('aria-label','แตะ'+products[i][1]+' '+products[i][2]+' · ถูกแล้ว '+picks[i]+' จาก '+run.order[i]+' ชิ้น');});
  $('retryTap').hidden=!tapFailed||busy||run.complete;
 }
 function shuffleProducts(){
@@ -47,7 +48,7 @@ function refreshPicks(){
  for(const i of [...(pending?(pending.products??[pending.product]):[]),...tapQueue])if(picks[i]<run.order[i])picks[i]++;
 }
 function pick(i,b){
- if(!run||run.complete||tapFailed||Date.now()>=deadline||tapQueue.length>=24||picks.every((n,j)=>n===run.order[j]))return;
+ if(!run||adminStopped||run.complete||tapFailed||Date.now()>=deadline||tapQueue.length>=24||picks.every((n,j)=>n===run.order[j]))return;
  const accepted=picks[i]<run.order[i];tapQueue.push(i);if(accepted)picks[i]++;
  tone(accepted);
  if(accepted){$('feedback').textContent=picks.every((n,j)=>n===run.order[j])?'ครบแล้ว กำลังยืนยันออร์เดอร์…':'ถูกต้อง! หาสินค้าชิ้นถัดไป';}
@@ -133,6 +134,7 @@ function applyLobby(state){
  clockOffset=Math.max(clockOffset,state.serverNow-Date.now());lobbyNotice='';
  const previousLast=lobby?.lastRound?.roundId;lobby=state;renderLobby();
  if(state.lastRound&&state.lastRound.roundId!==previousLast){renderRoundTop();board();}
+ if(state.lastRound?.stopped&&[currentRound,joinedRound].includes(state.lastRound.roundId)){adminStopped=true;clearTimeout(beginTimer);deadline=Math.min(deadline,Date.now());tapQueue=[];$('time').textContent='00:00';$('timebar').style.width='0%';if(run){render();if(!run.complete&&!busy)finish();}}
  if(state.phase==='round'&&state.you.inRound&&joinedRound!==state.roundId)joinRound(state);
 }
 function renderTop(id,rows,empty){
@@ -170,16 +172,19 @@ $('start').onclick=async()=>{if(socket?.readyState!==1||lobby?.phase!=='waiting'
 async function joinRound(state){
  joinedRound=state.roundId;
  for(let attempt=0;attempt<4;attempt++){
+  if(lobby?.lastRound?.stopped&&lobby.lastRound.roundId===state.roundId)return;
   try{
    const joined=await api('start',{rulesVersion:3,roundId:state.roundId});
-   if(joined.complete||joined.remaining<=0)return;
+   if(joined.complete||joined.remaining<=0||lobby?.lastRound?.stopped&&lobby.lastRound.roundId===state.roundId)return;
+   adminStopped=false;
    run=joined;currentRound=state.roundId;warnedSecond=-1;customerUntil=0;clearTimeout(customerTimer);$('customerBubble').hidden=true;boardDay=run.day;deadline=fromServer(run.deadline);picks=[...run.picks];pending=null;tapQueue=[];tapFailed=false;renderRoundTop();
    clearTimeout(beginTimer);beginTimer=setTimeout(()=>beginPlay(state),Math.max(0,fromServer(state.startAt)-Date.now()));return;
-  }catch(e){$('identity').textContent=e.message;await new Promise(done=>setTimeout(done,1000+attempt*500));}
+  }catch(e){if(lobby?.lastRound?.stopped&&lobby.lastRound.roundId===state.roundId)return;$('identity').textContent=e.message;await new Promise(done=>setTimeout(done,1000+attempt*500));}
  }
  lobbyNotice='เข้ารอบนี้ไม่สำเร็จ กรุณารอรอบถัดไป';renderLobbyClock();
 }
 function beginPlay(state){
+ if(adminStopped)return;
  orderClock=Math.max(fromServer(state.startAt),Date.now()-(run.orderElapsed||0));$('newRound').hidden=true;$('welcome').hidden=true;$('play').hidden=false;document.body.classList.add('playing');if($('result').open)$('result').close();$('feedback').textContent='แตะสินค้าให้ตรงออเดอร์ · ครบออร์เดอร์แล้วสินค้าจะสลับที่';busy=false;shuffleProducts();render();clearInterval(timer);timer=setInterval(tick,100);tick();window.scrollTo(0,0);
 }
 function backToLobby(){
@@ -194,20 +199,21 @@ async function submit(){
  if(!pending){const products=tapQueue.splice(0,12);pending={id:run.id,seq:run.seq+1,...(products.length===1?{product:products[0]}:{products})};}
  busy=true;tapFailed=false;render();
  try{
-  const previous=run,processed=pending.products??[pending.product];run=await api('tap',pending);pending=null;deadline=fromServer(run.deadline);orderClock=Date.now()-(run.orderElapsed||0);
+  const previous=run,processed=pending.products??[pending.product];run=await api('tap',pending);pending=null;deadline=adminStopped?Math.min(Date.now(),fromServer(run.deadline)):fromServer(run.deadline);orderClock=Date.now()-(run.orderElapsed||0);
   if(run.orders>previous.orders){tapQueue=[];shuffleProducts();$('feedback').textContent='ครบออเดอร์! +'+(run.score-previous.score)+' คะแนน 🎉';animate($('score'),'score-pop');if(run.combo>1)showCombo(run.combo,run.score-previous.score,(run.speedTotal||0)-(previous.speedTotal||0));}
   else if(run.errors>previous.errors){$('feedback').textContent=processed.some(i=>[3,7].includes(i))?'มีสินค้าหมดอายุ! คะแนนและเวลาลดลง':'เลือกผิด! คะแนนและเวลาลดลง';}
   refreshPicks();
  }catch(e){tapFailed=true;$('feedback').textContent=e.message+' · แตะลองยืนยันอีกครั้ง';}
  finally{
   busy=false;render();
-  if(Date.now()>=deadline||run.complete){tapQueue=[];finish();}
+  if(adminStopped||Date.now()>=deadline||run.complete){tapQueue=[];finish();}
   else if(!tapFailed&&tapQueue.length)submit();
  }
 }
 $('retryTap').onclick=submit;
 function result(){
  clearTimeout(comboTimer);clearTimeout(customerTimer);$('comboBurst').hidden=true;$('customerBubble').hidden=true;
+ $('resultTitle').textContent=adminStopped?'Admin จบรอบแล้ว':'จัดเต็มแล้ว รอบนี้!';
  $('resultScore').textContent=run.score;$('resultStats').replaceChildren();const attempts=run.orders+run.errors;
  [['โบนัสความเร็วรวม',run.speedTotal||0],['ออเดอร์สำเร็จ',run.orders],['ความแม่นยำ',attempts?Math.round(run.orders/attempts*100)+'%':'0%'],['แตะผิด',run.errors],['คอมโบสูงสุด',run.best]].forEach(([label,n])=>{const el=document.createElement('div'),b=document.createElement('b');b.textContent=n;el.append(b,document.createTextNode(label));$('resultStats').append(el);});
  renderRoundTop();if(!$('result').open)$('result').showModal();
