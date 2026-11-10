@@ -14,10 +14,10 @@ export function orderFor(day,index){
  let seed=2166136261;for(const c of `${day}:${index}:makro-v2`)seed=Math.imul(seed^c.charCodeAt(0),16777619)>>>0;
  const next=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed;};
  // Each three completed orders adds one step; quantities never drop.
- const stage=Math.min(11,Math.floor(index/3));
- const count=1+Math.floor(stage/3),quantity=1+stage%3;
+ const stage=Math.min(10,Math.floor(index/3));
+ const count=Math.min(4,2+Math.floor(stage/3)),total=2+stage;
  const amounts=Array(8).fill(0);
- let available=[0,1,2,4,5,6];for(let n=0;n<count;n++){const i=next()%available.length;amounts[available.splice(i,1)[0]]=n===0?quantity:3;}return amounts;
+ let available=[0,1,2,4,5,6];for(let n=0;n<count;n++){const i=next()%available.length;amounts[available.splice(i,1)[0]]=Math.floor(total/count)+(n<total%count?1:0);}return amounts;
 }
 // Store tap progress with the last event in one row so retries and sequence
 // updates are atomic, including when the final tap advances the order.
