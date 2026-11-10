@@ -30,7 +30,7 @@ function render(){
  $('send').classList.toggle('ready',exact&&!pending);
  $('orderItems').replaceChildren();run.order.forEach((n,i)=>{if(!n)return;const item=document.createElement('div'),label=document.createElement('span'),quantity=document.createElement('b');item.className='order-item'+(picks[i]===n?' done':picks[i]>n?' over':'');label.textContent=products[i].join(' ');quantity.className='order-quantity';quantity.textContent=(picks[i]===n?'✓ ':'')+picks[i]+'/'+n;item.append(label,quantity);$('orderItems').append(item);});
  $('basketItems').replaceChildren();picks.forEach((n,i)=>{if(!n)return;const b=document.createElement('button');b.textContent=products[i][0]+' '+products[i][1]+' '+products[i][2]+' ×'+n+' −';b.disabled=busy||run.complete||!!pending;b.onclick=()=>{if(busy||run.complete||Date.now()>=deadline)return;picks[i]--;render();};$('basketItems').append(b);});
- $('send').disabled=busy||run.complete||!picks.some(Boolean);$('send').textContent=pending?'ลองส่งออเดอร์เดิมอีกครั้ง':busy?'กำลังตรวจออเดอร์…':exact?'ครบแล้ว ส่งเลย ✓':'ส่งออเดอร์ →';
+ $('send').disabled=busy||run.complete||!picks.some(Boolean);$('send').textContent=pending?'ลองส่งออเดอร์เดิมอีกครั้ง':busy?'กำลังตรวจออเดอร์…':exact?'ส่งออเดอร์ ✓':'ส่งออเดอร์ →';
  document.querySelectorAll('.product').forEach((b,i)=>{b.disabled=busy||run.complete||!!pending;b.classList.toggle('selected',picks[i]>0);b.classList.toggle('over-picked',picks[i]>run.order[i]);b.querySelector('.pick-badge').textContent=picks[i]?String(picks[i]):'';b.setAttribute('aria-label','หยิบ'+products[i][1]+' '+products[i][2]+' · ในตะกร้า '+picks[i]+' ชิ้น');});
 }
 let drag=null,lastDrag=0,lastDragButton=null;

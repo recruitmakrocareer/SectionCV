@@ -1964,3 +1964,9 @@ dialog::backdrop {
     font-size: 8px;
   }
 }
+
+@media (max-width: 370px) {
+  body.playing .basket { padding: 8px 6px 7px; }
+  body.playing .ticket { padding: 7px 8px; }
+  body.playing #send { font-size: 11px; }
+}
