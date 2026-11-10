@@ -305,7 +305,7 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
             if (!admitted.ok) fail('คุณไม่ได้อยู่ในรอบนี้ กรุณารอรอบถัดไป', 409);
             return json(await orderAPI(db, user, url.pathname, { ...data, round: await admitted.json() }, now()));
           }
-          if (['/api/orders/submit','/api/orders/finish'].includes(url.pathname)) return json(await orderAPI(db, user, url.pathname, data, now()));
+          if (['/api/orders/submit','/api/orders/tap','/api/orders/finish'].includes(url.pathname)) return json(await orderAPI(db, user, url.pathname, data, now()));
           if (url.pathname === '/api/logout') {
             await stmt('DELETE FROM sessions WHERE token_hash=?', user.token_hash).run();
             return json({ ok: true }, 200, { 'Set-Cookie': cookie('mk_session', '', 0) });
