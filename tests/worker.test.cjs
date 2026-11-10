@@ -536,6 +536,24 @@ test('lobby runs in workerd: admin starts an all-ready shared round and only its
  assert.equal(board.live,true);assert.equal(board.roundId,roundA.roundId);assert.equal(board.round.count,2);assert.equal(board.scores.length,1);
  assert.deepEqual(board.scores[0],{name:'New round name',score:0,orders:0,errors:0,combo:0,best:0,finished:false,rank:1});
  assert.ok(!JSON.stringify(board).includes('0812345678'),'contact numbers never reach the live board');assert.ok(!JSON.stringify(board).includes(a.id),'user ids never reach the live board');
+ const stop=(roundId,key='live-board-test',requestOrigin=origin)=>mf.dispatchFetch(origin+'/api/admin/stop',{method:'POST',headers:{Origin:requestOrigin,'X-Admin-Key':key,'Content-Type':'application/json'},body:JSON.stringify({roundId})});
+ const finish=()=>mf.dispatchFetch(origin+'/api/orders/finish',{method:'POST',headers:{Cookie:`mk_session=${a.token}`,Origin:origin,'X-CSRF-Token':a.csrf,'Content-Type':'application/json'},body:JSON.stringify({id:body.id})});
+ assert.equal((await finish()).status,409,'active games cannot finish early without admin stop');
+ await DB.prepare('UPDATE order_runs_v3 SET score=1234 WHERE id=?').bind(body.id).run();
+ assert.equal((await stop(roundA.roundId,'wrong')).status,401);assert.equal((await stop(roundA.roundId,'live-board-test','https://evil.test')).status,403);
+ assert.equal((await stop(randomUUID())).status,409,'stale admin cannot stop a different round');
+ const stops=await Promise.all([stop(roundA.roundId),stop(roundA.roundId)]);assert.deepEqual(stops.map(r=>r.status).sort(),[200,409]);
+ await until(first,s=>s.phase==='waiting'&&s.lastRound?.stopped);
+ const ended=await (await finish()).json();assert.equal(ended.complete,true);assert.equal(ended.score,1234);assert.equal(ended.remaining,0);
+ const finalBoard=await (await live('live-board-test')).json();assert.equal(finalBoard.live,false);assert.equal(finalBoard.scores[0].score,1234);assert.equal(finalBoard.scores[0].finished,true);
+ assert.equal((await start(b,roundA.roundId)).status,409);
+ // Simulate a start request admitted before stop, arriving at D1 after a new round starts.
+ first.ws.send(JSON.stringify({type:'ready',ready:true}));second.ws.send(JSON.stringify({type:'ready',ready:true}));await until(first,s=>s.phase==='waiting'&&s.readyCount===2&&s.lastRound?.roundId===roundA.roundId);
+ assert.equal((await adminStart()).status,200);const next=await until(second,s=>s.phase==='round'&&s.roundId!==roundA.roundId);
+ const nextRun=await (await start(b,next.roundId)).json();
+ const {orderAPI}=await import('../worker/order-game.mjs');await assert.rejects(orderAPI(DB,{id:b.id},'/api/orders/start',{rulesVersion:3,round:{id:roundA.roundId,startAt:roundA.startAt,endAt:roundA.endAt}},Date.now()),e=>e.status===409);
+ assert.equal((await DB.prepare('SELECT complete FROM order_runs_v3 WHERE id=?').bind(nextRun.id).first()).complete,0,'late old admission cannot close the new run');
+ assert.equal((await stop(next.roundId)).status,200);
  first.ws.close();second.ws.close();
  await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id IN (?,?)').bind(a.id,b.id).run();
 });

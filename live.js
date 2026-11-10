@@ -10,6 +10,7 @@
   let clockTimer = null;
   let inFlight = false;
   let starting = false;
+  let stopping = false;
   let removing = false;
   let mutation = 0;
   try { key = sessionStorage.getItem(STORE) || ''; } catch {}
@@ -63,6 +64,7 @@
       $('conn').textContent = '';
     } catch {
       $('startGame').disabled = true;
+      $('stopGame').disabled = true;
       $('conn').textContent = 'การเชื่อมต่อสะดุด กำลังลองใหม่…';
     } finally {
       inFlight = false;
@@ -100,9 +102,11 @@
   function render() {
     renderClock();
     $('startGame').hidden = false;
+    $('stopGame').hidden = !data.live;
+    $('stopGame').disabled = stopping || starting || removing || !data.live;
     const unreadyNames = (data.players || []).filter(player => !player.ready).slice(0, 6).map(player => player.name);
-    $('startHint').textContent = data.live ? 'มีรอบกำลังเล่นอยู่ รอจบรอบก่อนเริ่มใหม่' : data.canStart ? `พร้อมครบ ${data.readyCount}/${data.count} คน · Admin กดเริ่มเกมได้เลย` : !data.count ? 'ยังไม่มีผู้เล่นในห้อง ให้ผู้เล่นเข้าเกมและกดเตรียมพร้อมก่อน' : `พร้อม ${data.readyCount}/${data.count} คน · รอทุกคนกดเตรียมพร้อม` + (unreadyNames.length ? ' · ยังไม่พร้อม: ' + unreadyNames.join(', ') : '');
-    $('startGame').disabled = starting || removing || !data.canStart || data.live;
+    $('startHint').textContent = data.live ? 'กดหยุดเกมและสรุปคะแนนได้ทันที โดยไม่ต้องรอหมดเวลา' : data.canStart ? `พร้อมครบ ${data.readyCount}/${data.count} คน · Admin กดเริ่มเกมได้เลย` : !data.count ? 'ยังไม่มีผู้เล่นในห้อง ให้ผู้เล่นเข้าเกมและกดเตรียมพร้อมก่อน' : `พร้อม ${data.readyCount}/${data.count} คน · รอทุกคนกดเตรียมพร้อม` + (unreadyNames.length ? ' · ยังไม่พร้อม: ' + unreadyNames.join(', ') : '');
+    $('startGame').disabled = starting || stopping || removing || !data.canStart || data.live;
     const rows = data.scores || [];
     const leader = rows[0];
     $('leader').hidden = !leader;
@@ -139,7 +143,7 @@
         const button = document.createElement('button');
         button.type = 'button'; button.className = 'remove-player'; button.textContent = 'นำออก';
         button.setAttribute('aria-label', `นำ ${player.name} ออกจากห้องรอ`);
-        button.disabled = removing || starting;
+        button.disabled = removing || starting || stopping;
         button.onclick = () => removePlayer(player);
         li.append(button);
       }
@@ -149,7 +153,7 @@
   }
 
   async function removePlayer(player) {
-    if (removing || starting || data?.live) return;
+    if (removing || starting || stopping || data?.live) return;
     removing = true; mutation++; render();
     $('startStatus').textContent = `กำลังนำ ${player.name} ออกจากห้องรอ…`;
     try {
@@ -163,8 +167,23 @@
     finally { removing = false; await poll(); }
   }
 
+  $('stopGame').addEventListener('click', async () => {
+    if (stopping || starting || removing || !data?.live) return;
+    stopping = true; mutation++; render();
+    $('startStatus').textContent = 'กำลังหยุดเกมและบันทึกคะแนน…';
+    try {
+      const response = await fetch('api/admin/stop', { method: 'POST', headers: { 'X-Admin-Key': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roundId: data.roundId }), credentials: 'same-origin', cache: 'no-store' });
+      const value = await response.json();
+      if (response.status === 401) { remember(''); showLogin(value.error); return; }
+      if (!response.ok) throw new Error(value.error || 'หยุดเกมไม่สำเร็จ');
+      $('startStatus').textContent = 'หยุดเกมและบันทึกคะแนนแล้ว';
+    } catch (error) { $('startStatus').textContent = error.message; }
+    finally { stopping = false; await poll(); }
+  });
+
   $('startGame').addEventListener('click', async () => {
-    if (starting || removing || !data?.canStart || data.live) return;
+    if (starting || stopping || removing || !data?.canStart || data.live) return;
     starting = true;
     mutation++;
     $('startGame').disabled = true;

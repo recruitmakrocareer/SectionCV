@@ -8,6 +8,7 @@ export const schema = `CREATE TABLE IF NOT EXISTS order_runs_v3 (
  best INTEGER NOT NULL DEFAULT 0, seq INTEGER NOT NULL DEFAULT 0,
  complete INTEGER NOT NULL DEFAULT 0, payload TEXT NOT NULL DEFAULT ''
 )`;
+export const stopSchema = `CREATE TABLE IF NOT EXISTS order_round_stops (id TEXT PRIMARY KEY, stopped INTEGER NOT NULL)`;
 const bad=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
 export const dayOf=ms=>new Date(ms+7*3600000).toISOString().slice(0,10);
 export function orderFor(day,index){
@@ -27,7 +28,7 @@ export async function orderAPI(db,user,path,data,now){
  const q=(s,...v)=>db.prepare(s).bind(...v);
  // Idempotent bootstrap allows the existing dashboard deployment command to work.
  if(path==='/api/orders/start'||path==='/api/orders/board'){
-  await db.batch([db.prepare(schema),db.prepare('CREATE INDEX IF NOT EXISTS idx_order_v3_day ON order_runs_v3(day,complete,user_id)')]);
+  await db.batch([db.prepare(schema),db.prepare(stopSchema),db.prepare('CREATE INDEX IF NOT EXISTS idx_order_v3_day ON order_runs_v3(day,complete,user_id)')]);
  }
  if(path==='/api/orders/board'){
   const day=data?.day||dayOf(now);if(!/^\d{4}-\d{2}-\d{2}$/.test(day))bad('วันที่ไม่ถูกต้อง');
@@ -46,15 +47,17 @@ export async function orderAPI(db,user,path,data,now){
   // and the lobby can find every score in the round from the id prefix.
   const id=`round:${round.id}:${user.id}`;
   const existing=await q('SELECT * FROM order_runs_v3 WHERE id=? AND user_id=?',id,user.id).first();if(existing)return view(existing,now);
-  await q('UPDATE order_runs_v3 SET complete=1 WHERE user_id=? AND complete=0',user.id).run();
+  await q('UPDATE order_runs_v3 SET complete=1 WHERE user_id=? AND complete=0 AND NOT EXISTS(SELECT 1 FROM order_round_stops WHERE id=?)',user.id,round.id).run();
   // The partial unique index serializes concurrent start requests.
   await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_order_v3_active ON order_runs_v3(user_id) WHERE complete=0').run();
-  await q('INSERT OR IGNORE INTO order_runs_v3(id,user_id,day,started,deadline,updated,order_started) VALUES(?,?,?,?,?,?,?)',id,user.id,dayOf(round.startAt),round.startAt,round.endAt,round.startAt,round.startAt).run();
-  return view(await q('SELECT * FROM order_runs_v3 WHERE id=? AND user_id=?',id,user.id).first(),now);
+  await q('INSERT OR IGNORE INTO order_runs_v3(id,user_id,day,started,deadline,updated,order_started) SELECT ?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM order_round_stops WHERE id=?)',id,user.id,dayOf(round.startAt),round.startAt,round.endAt,round.startAt,round.startAt,round.id).run();
+  const created=await q('SELECT * FROM order_runs_v3 WHERE id=? AND user_id=?',id,user.id).first();
+  if(!created)bad('Admin จบรอบนี้แล้ว กรุณารอรอบถัดไป',409);
+  return view(created,now);
  }
  const r=await q('SELECT * FROM order_runs_v3 WHERE id=? AND user_id=?',typeof data.id==='string'?data.id:'',user.id).first();if(!r)bad('ไม่พบรอบเกม',404);
  if(path==='/api/orders/finish'){
-  if(now<r.deadline)bad('ยังไม่หมดเวลา',409);
+  if(!r.complete&&now<r.deadline)bad('ยังไม่หมดเวลา',409);
   await q('UPDATE order_runs_v3 SET complete=1 WHERE id=?',r.id).run();return view({...r,complete:1},now);
  }
  if(path==='/api/orders/tap'){

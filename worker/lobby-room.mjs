@@ -1,3 +1,4 @@
+import { schema as orderSchema, stopSchema } from './order-game.mjs';
 // One shared Order Rush room. A single Durable Object serializes every ready
 // click and owns the round clock, so all players receive the same start time.
 export const COUNTDOWN_MS = 5000;
@@ -25,6 +26,19 @@ export class LobbyRoom {
 
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === '/stop' && request.method === 'POST') {
+      const { roundId } = await request.json();
+      return this.ctx.blockConcurrencyWhile(async () => {
+        if (this.state.phase !== 'round' || this.state.round?.id !== roundId) return Response.json({ error: 'รอบนี้จบแล้ว หรือมีรอบใหม่เริ่มอยู่ กรุณาตรวจสถานะอีกครั้ง' }, { status: 409 });
+        try {
+          await this.env.DB.batch([this.env.DB.prepare(orderSchema), this.env.DB.prepare(stopSchema)]);
+          await this.finishRound({ stopped: true });
+          await this.ctx.storage.deleteAlarm();
+          this.broadcast();
+          return Response.json({ ok: true, roundId });
+        } catch { return Response.json({ error: 'หยุดเกมไม่สำเร็จ กรุณาลองอีกครั้ง' }, { status: 503 }); }
+      });
+    }
     if (url.pathname === '/rename' && request.method === 'POST') {
       const { userId, name } = await request.json();
       return this.ctx.blockConcurrencyWhile(async () => {
@@ -88,7 +102,7 @@ export class LobbyRoom {
         phase, readyDeadline, count: players.length, readyCount: players.filter((player) => player.ready).length,
         players: players.slice(0, MAX_LISTED).map((player) => ({ id: player.kickId, name: player.name, ready: player.ready, canRemove: phase === 'waiting' && !player.ready })),
         round: round && { id: round.id, startAt: round.startAt, endAt: round.endAt, count: round.players.length },
-        lastRound: lastRound && { roundId: lastRound.roundId, failed: lastRound.failed,
+        lastRound: lastRound && { roundId: lastRound.roundId, failed: lastRound.failed, stopped: !!lastRound.stopped,
           top: lastRound.top.map(({ userId, ...row }, index) => ({ ...row, rank: index + 1 })) }
       });
     }
@@ -154,7 +168,7 @@ export class LobbyRoom {
     this.broadcast();
   }
 
-  async finishRound() {
+  async finishRound({ stopped = false } = {}) {
     const { id } = this.state.round;
     const prefix = `round:${id}:%`;
     let top = [];
@@ -162,16 +176,18 @@ export class LobbyRoom {
     try {
       // Scores stop changing at each run's deadline, so a player who closed the
       // game still gets their final score and a place on the daily board.
-      const [, rows] = await this.env.DB.batch([
-        this.env.DB.prepare('UPDATE order_runs_v3 SET complete=1 WHERE id LIKE ? AND complete=0').bind(prefix),
+      const results = await this.env.DB.batch([
+        ...(stopped ? [this.env.DB.prepare('INSERT OR IGNORE INTO order_round_stops(id,stopped) VALUES(?,?)').bind(id, this.now()),
+          this.env.DB.prepare('UPDATE order_runs_v3 SET complete=1,deadline=MIN(deadline,?) WHERE id LIKE ?').bind(this.now(), prefix)] :
+          [this.env.DB.prepare('UPDATE order_runs_v3 SET complete=1 WHERE id LIKE ? AND complete=0').bind(prefix)]),
         this.env.DB.prepare(`SELECT COALESCE(NULLIF(u.name,''),u.line_name) AS name,r.score,r.errors,r.orders,r.user_id AS userId
           FROM order_runs_v3 r JOIN users u ON u.id=r.user_id WHERE r.id LIKE ?
           ORDER BY r.score DESC,r.errors ASC,r.deadline ASC,r.id ASC LIMIT 5`).bind(prefix)
       ]);
-      top = rows.results;
-    } catch { failed = true; }
+      top = results.at(-1).results;
+    } catch (error) { if (stopped) throw error; failed = true; }
     for (const ws of this.sockets()) ws.serializeAttachment({ ...ws.deserializeAttachment(), ready: false });
-    this.state = { ...emptyState(), lastRound: { roundId: id, top, failed } };
+    this.state = { ...emptyState(), lastRound: { roundId: id, top, failed, stopped } };
     await this.save();
   }
 
@@ -185,7 +201,7 @@ export class LobbyRoom {
       players: players.slice(0, MAX_LISTED).map((entry) => ({ name: entry.name, ready: entry.ready, me: entry.userId === player.userId })),
       roundId: round?.id ?? null, startAt: round?.startAt ?? null, endAt: round?.endAt ?? null,
       you: { ready: player.ready, inRound: !!round?.players.includes(player.userId) },
-      lastRound: lastRound && { roundId: lastRound.roundId, failed: lastRound.failed,
+      lastRound: lastRound && { roundId: lastRound.roundId, failed: lastRound.failed, stopped: !!lastRound.stopped,
         top: lastRound.top.map(({ userId, ...row }, index) => ({ ...row, rank: index + 1, isMe: userId === player.userId })) }
     };
   }
