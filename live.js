@@ -79,10 +79,10 @@
       clock = '00:00';
     } else if (data.roundId) {
       phase = 'จบรอบแล้ว · ผลรอบล่าสุด';
-      note = data.readyDeadline ? `รอบถัดไปจะเริ่มภายใน ${clockText(data.readyDeadline - now)} หรือเมื่อทุกคนพร้อม` : 'รอผู้เล่นกดเตรียมพร้อมสำหรับรอบถัดไป';
+      note = 'รอผู้เล่นทุกคนกดเตรียมพร้อมสำหรับรอบถัดไป';
     } else {
       phase = 'ยังไม่มีรอบที่แข่ง';
-      note = data.readyDeadline ? `รอบแรกจะเริ่มภายใน ${clockText(data.readyDeadline - now)} หรือเมื่อทุกคนพร้อม` : 'รอผู้เล่นเข้าห้องและกดเตรียมพร้อม';
+      note = 'รอผู้เล่นอย่างน้อย 2 คน และกดเตรียมพร้อมครบทุกคน';
     }
     $('phase').textContent = phase;
     $('phaseNote').textContent = note;

@@ -2195,3 +2195,82 @@ body.playing .truck-shop .product-art { min-height: 110px; }
   body.playing .truck-shop .shelf { min-height: 760px; grid-template-rows: repeat(4,190px); }
   body.playing .truck-shop .product-art { min-height: 120px; }
 }
+/* Fit the complete playing field into one viewport. */
+body.playing { height: 100dvh; overflow: hidden; }
+body.playing header { height: 44px; }
+body.playing header .brand img { height: 36px; }
+body.playing main { height: calc(100dvh - 44px); min-height: 0; padding: 6px 10px max(6px,env(safe-area-inset-bottom)); }
+body.playing #play { height: 100%; min-height: 0; grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto 22px minmax(0,1fr) auto; gap: 6px; }
+body.playing .hud { padding-top: 4px; }
+body.playing .hud strong { font-size: 25px; }
+body.playing .hud .clock strong { font-size: 29px; }
+body.playing .hud small { font-size: 9px; margin-bottom: 0; }
+body.playing .track { margin-top: 4px; height: 4px; }
+body.playing .ticket { position: static; padding: 8px 10px; }
+body.playing .ticket > .ticket-head { font-size: 16px; }
+body.playing .order-progress { font-size: 13px; }
+body.playing #orderNumber { font-size: 14px; }
+body.playing .order-items { gap: 5px; margin-top: 6px; }
+body.playing .order-item { flex: 1 1 21%; padding: 6px 8px; font-size: 16px; gap: 6px; justify-content: space-between; }
+body.playing .order-quantity { font-size: 19px; padding: 3px 5px; }
+body.playing .pressure-line { font-size: 11px; padding-top: 4px; min-height: 0; }
+body.playing .truck-shop { min-height: 0; padding: 10px; background: #d71935 url('art/makro-truck.webp') center / cover no-repeat; }
+body.playing .truck-shop .shelf { position: relative; inset: auto; width: 100%; height: 100%; min-height: 0; grid-template-columns: repeat(4,minmax(0,1fr)); grid-template-rows: repeat(2,minmax(0,1fr)); }
+body.playing .truck-shop .product { min-height: 0; padding: 5px; gap: 2px; grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto auto; }
+body.playing .truck-shop .product-art { grid-column: 1; grid-row: 1; width: 100%; height: 100%; min-height: 0; max-height: none; }
+body.playing .truck-shop .product-name { font-size: 16px; line-height: 1.2; }
+body.playing .truck-shop .product small { font-size: 13px; line-height: 1.2; padding: 2px 4px; }
+body.playing .tap-status { position: static; padding: 4px 8px; }
+body.playing #feedback { font-size: 13px; min-height: 18px; margin: 0; line-height: 1.35; }
+body.playing #retryTap { min-height: 36px; font-size: 14px; padding: 5px 10px; }
+@media (max-width: 700px) {
+  body.playing .order-item { flex-basis: 44%; font-size: 14px; padding: 4px 6px; }
+  body.playing .order-quantity { font-size: 17px; }
+  body.playing .truck-shop { padding: 6px; }
+  body.playing .truck-shop .shelf { border-width: 3px; }
+  body.playing .truck-shop .product { padding: 3px; border-right-width: 2px; border-bottom-width: 5px; }
+  body.playing .truck-shop .product-name { font-size: 13px; }
+  body.playing .truck-shop .product small { font-size: 11px; padding: 2px; }
+}
+@media (max-height: 520px) {
+  body.playing header { height: 34px; }
+  body.playing header .brand img { height: 28px; }
+  body.playing main { height: calc(100dvh - 34px); padding-top: 4px; padding-bottom: 4px; }
+  body.playing #play { gap: 4px; grid-template-rows: auto auto 18px minmax(0,1fr) auto; }
+  body.playing .hud small, body.playing .pressure-line { display: none; }
+  body.playing .hud strong, body.playing .hud .clock strong { font-size: 20px; }
+  body.playing .ticket { padding: 4px 8px; }
+  body.playing .order-item { padding: 3px 5px; font-size: 13px; }
+  body.playing .order-quantity { font-size: 15px; padding: 2px 4px; }
+  body.playing .truck-shop .product-name { font-size: 12px; }
+  body.playing .truck-shop .product small { font-size: 10px; }
+  body.playing .tap-status { padding: 2px 6px; }
+}
+body.playing .tap-status { display: flex; align-items: center; justify-content: center; gap: 8px; }
+body.playing #feedback { flex: 1; min-width: 0; }
+body.playing #retryTap { flex: none; }
+@media (max-width: 700px) and (max-height: 700px) {
+  body.playing .pressure-line { display: none; }
+  body.playing .ticket > .ticket-head { font-size: 14px; }
+  body.playing .order-progress { font-size: 12px; }
+  body.playing .order-item { font-size: 12px; line-height: 1.2; padding: 4px; }
+  body.playing .order-quantity { font-size: 16px; }
+  body.playing .step-dot { width: 18px; height: 18px; }
+  body.playing #feedback { font-size: 12px; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  body.playing #play { grid-template-columns: 210px minmax(0,1fr); grid-template-rows: auto 18px minmax(0,1fr) auto; }
+  body.playing .hud { grid-column: 1/-1; grid-row: 1; }
+  body.playing .ticket { grid-column: 1; grid-row: 2/4; }
+  body.playing .ticket > .ticket-head { font-size: 13px; gap: 3px; }
+  body.playing .order-progress { font-size: 11px; }
+  body.playing .order-items { display: grid; grid-template-columns: minmax(0,1fr); gap: 3px; }
+  body.playing .order-item { font-size: 12px; padding: 3px; }
+  body.playing .order-quantity { font-size: 14px; }
+  body.playing .shelf-title { grid-column: 2; grid-row: 2; }
+  body.playing .truck-shop { grid-column: 2; grid-row: 3; padding: 4px; }
+  body.playing .truck-shop .product { padding: 2px; border-bottom-width: 3px; }
+  body.playing .truck-shop .product-name { font-size: 11px; }
+  body.playing .truck-shop .product small { font-size: 10px; padding: 1px; }
+  body.playing .tap-status { grid-column: 1/-1; grid-row: 4; }
+}
