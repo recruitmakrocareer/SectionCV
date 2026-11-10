@@ -463,7 +463,7 @@ test('order rush client plays through D1, retries a lost submit and displays con
  const dom=new JSDOM(readFileSync(join(root,'order-game/index.html'),'utf8'),{url:origin+'/order-game/',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
  w.AbortSignal=AbortSignal;w.Date.now=f.now;let onTick;w.setInterval=fn=>{onTick=fn;return 1;};w.clearInterval=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.scrollTo=()=>{};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
- let lose=true;w.fetch=async(url,options={})=>{const p=new URL(url,origin+'/order-game/').pathname+new URL(url,origin+'/order-game/').search;const response=await f.raw(p,options.body?JSON.parse(options.body):undefined);if(p.endsWith('/submit')&&lose){lose=false;throw Error('lost response');}return response;};
+ let lose=true;w.fetch=async(url,options={})=>{const p=new URL(url,origin+'/order-game/').pathname+new URL(url,origin+'/order-game/').search;const response=await f.raw(p,options.body?JSON.parse(options.body):undefined);if(p.endsWith('/tap')&&lose){lose=false;throw Error('lost response');}return response;};
  const wait=async check=>{for(let i=0;i<150;i++){if(check())return;await new Promise(r=>setTimeout(r,20));}assert.fail('client state timed out');};
  const realFetch=w.fetch;let inflight=0;w.fetch=(...args)=>{inflight++;return realFetch(...args).finally(()=>setTimeout(()=>{inflight--;},20));};
  let socket;w.WebSocket=class{constructor(url){socket=this;this.url=String(url);this.readyState=1;this.sent=[];}send(text){this.sent.push(JSON.parse(text));}};
@@ -471,9 +471,11 @@ test('order rush client plays through D1, retries a lost submit and displays con
  w.eval(readFileSync(join(root,'order-game/game.js'),'utf8'));await wait(()=>socket?.onmessage);assert.equal(socket.url,'wss://game.test/api/lobby/ws');state();await wait(()=>!w.document.getElementById('start').disabled);
  assert.equal(w.document.querySelectorAll('#lobbyPlayers li').length,2);w.document.getElementById('start').click();assert.deepEqual(socket.sent,[{type:'ready',ready:true}]);assert.equal(w.document.getElementById('play').hidden,true,'readying up alone must not start the game');
  state({phase:'round',roundId:f.roundId,startAt:f.now(),endAt:f.now()+90000,you:{ready:true,inRound:true}});await wait(()=>!w.document.getElementById('play').hidden);
- const order=orderFor(dayOf(f.now()),0),buttons=w.document.querySelectorAll('.product');order.forEach((n,i)=>{for(let k=0;k<n;k++)buttons[i].click();});f.tick(1000);
- w.document.getElementById('send').click();await wait(()=>w.document.getElementById('feedback').textContent.includes('ยืนยันรายการเดิม'));w.document.getElementById('send').click();await wait(()=>w.document.getElementById('score').textContent==='290');
- const second=orderFor(dayOf(f.now()),1);second.forEach((n,i)=>{for(let k=0;k<n;k++)buttons[i].click();});f.tick(1000);w.document.getElementById('send').click();await wait(()=>w.document.getElementById('score').textContent==='600');
+ const tap=async index=>{f.tick(1000);w.document.querySelector(`[data-product="${index}"]`).click();await wait(()=>inflight===0);};
+ const order=orderFor(dayOf(f.now()),0);await tap(order.findIndex(Boolean));
+ await wait(()=>w.document.getElementById('feedback').textContent.includes('ลองยืนยัน'));
+ assert.equal(w.document.getElementById('retryTap').hidden,false);w.document.getElementById('retryTap').click();await wait(()=>w.document.getElementById('score').textContent==='290');
+ const second=orderFor(dayOf(f.now()),1);await tap(second.findIndex(Boolean));await wait(()=>w.document.getElementById('score').textContent==='600');
  assert.equal(w.document.getElementById('comboBurst').hidden,false);assert.match(w.document.getElementById('comboBurst').textContent,/COMBO ×2/);
  f.tick(90000);onTick();await wait(()=>w.document.getElementById('saveStatus').textContent.includes('อันดับดีที่สุด'));
  assert.equal(w.document.getElementById('result').open,true);assert.equal(w.document.getElementById('resultScore').textContent,'600');assert.equal(w.document.querySelectorAll('.rank-row.mine').length,1);assert.equal(w.document.getElementById('again').disabled,false);
@@ -594,4 +596,22 @@ test('live board needs the admin password secret and renders scores as text', as
  assert.equal(w.document.getElementById('phase').textContent,'กำลังแข่งอยู่');assert.match(w.document.getElementById('clock').textContent,/^01:(19|20)$/);
  assert.match(w.document.querySelectorAll('#rows tr')[1].textContent,/จบแล้ว/);assert.match(w.document.getElementById('waitingTitle').textContent,/3 คน/);
  w.document.getElementById('logout').click();assert.equal(w.document.getElementById('board').hidden,true);assert.equal(w.sessionStorage.getItem('mk_admin_key'),null);
+});
+test('direct taps are authoritative, idempotent, preserve partial progress and finish orders automatically',async t=>{
+ const f=await fixture(t),other=await fixture(t);let r=(await f.request('/api/orders/start',{rulesVersion:3,roundId:f.roundId})).body;
+ const send=product=>f.request('/api/orders/tap',{id:r.id,seq:r.seq+1,product,score:999999});
+ assert.equal((await other.request('/api/orders/tap',{id:r.id,seq:1,product:0})).status,404);
+ assert.equal((await send(8)).status,400);
+ for(let n=0;n<3;n++){
+  f.tick(1000);const event={id:r.id,seq:r.seq+1,product:r.order.findIndex(Boolean)};
+  const [a,b]=await Promise.all([f.request('/api/orders/tap',event),f.request('/api/orders/tap',event)]);
+  assert.equal(a.status,200);assert.equal(b.status,200);assert.equal(a.body.orders,n+1);assert.equal(b.body.score,a.body.score);r=a.body;
+ }
+ const product=r.order.findIndex(Boolean);assert.equal(r.order[product],2);
+ f.tick(1000);r=(await send(product)).body;assert.equal(r.orders,3);assert.equal(r.picks[product],1);assert.equal(r.accepted,true);
+ const resumed=(await f.request('/api/orders/start',{rulesVersion:3,roundId:f.roundId})).body;assert.deepEqual(resumed.picks,r.picks);
+ const score=r.score,deadline=r.deadline;f.tick(100);r=(await send(7)).body;
+ assert.equal(r.accepted,false);assert.equal(r.score,score-100);assert.equal(r.deadline,deadline-8000);assert.equal(r.picks[product],1);assert.equal(r.combo,0);
+ f.tick(100);r=(await send(product)).body;assert.equal(r.orders,4);assert.deepEqual(r.picks,Array(8).fill(0));
+ f.tick(90000);const late=(await send(r.order.findIndex(Boolean))).body;assert.equal(late.complete,true);assert.equal(late.score,r.score);assert.equal(late.orders,4);
 });
