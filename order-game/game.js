@@ -24,10 +24,14 @@ $('sound').onclick=()=>{sound=!sound;$('sound').textContent='เสียง: '+
 function animate(node,cls){node.classList.remove(cls);void node.offsetWidth;node.classList.add(cls);}
 function render(){
  $('cartCount').textContent=picks.reduce((a,b)=>a+b,0)+' ชิ้น';$('score').textContent=run.score;$('combo').textContent='×'+run.combo;$('orderNumber').textContent='#'+(run.orders+1);
- $('orderItems').replaceChildren();run.order.forEach((n,i)=>{if(!n)return;const item=document.createElement('div');item.className='order-item'+(picks[i]===n?' done':'');item.textContent=products[i].join(' ')+' ×'+n;$('orderItems').append(item);});
+ const exact=run.order.every((n,i)=>picks[i]===n),extra=picks.some((n,i)=>n>run.order[i]),total=run.order.reduce((a,b)=>a+b,0),matched=run.order.reduce((a,n,i)=>a+Math.min(n,picks[i]),0);
+ $('orderProgress').textContent=exact?'✓ ครบแล้ว พร้อมส่ง!':extra?'มีสินค้าเกิน · แตะในตะกร้าเพื่อลด':'หยิบ '+matched+'/'+total+' ชิ้น';
+ $('orderProgress').className='order-progress'+(exact?' complete':extra?' over':'');
+ $('send').classList.toggle('ready',exact&&!pending);
+ $('orderItems').replaceChildren();run.order.forEach((n,i)=>{if(!n)return;const item=document.createElement('div'),label=document.createElement('span'),quantity=document.createElement('b');item.className='order-item'+(picks[i]===n?' done':picks[i]>n?' over':'');label.textContent=products[i].join(' ');quantity.className='order-quantity';quantity.textContent=(picks[i]===n?'✓ ':'')+picks[i]+'/'+n;item.append(label,quantity);$('orderItems').append(item);});
  $('basketItems').replaceChildren();picks.forEach((n,i)=>{if(!n)return;const b=document.createElement('button');b.textContent=products[i][0]+' '+products[i][1]+' '+products[i][2]+' ×'+n+' −';b.disabled=busy||run.complete||!!pending;b.onclick=()=>{if(busy||run.complete||Date.now()>=deadline)return;picks[i]--;render();};$('basketItems').append(b);});
- $('send').disabled=busy||run.complete||!picks.some(Boolean);$('send').textContent=pending?'ลองส่งออเดอร์เดิมอีกครั้ง':busy?'กำลังตรวจออเดอร์…':'ส่งออเดอร์ →';
- document.querySelectorAll('.product').forEach(b=>b.disabled=busy||run.complete||!!pending);
+ $('send').disabled=busy||run.complete||!picks.some(Boolean);$('send').textContent=pending?'ลองส่งออเดอร์เดิมอีกครั้ง':busy?'กำลังตรวจออเดอร์…':exact?'ครบแล้ว ส่งเลย ✓':'ส่งออเดอร์ →';
+ document.querySelectorAll('.product').forEach((b,i)=>{b.disabled=busy||run.complete||!!pending;b.classList.toggle('selected',picks[i]>0);b.classList.toggle('over-picked',picks[i]>run.order[i]);b.querySelector('.pick-badge').textContent=picks[i]?String(picks[i]):'';b.setAttribute('aria-label','หยิบ'+products[i][1]+' '+products[i][2]+' · ในตะกร้า '+picks[i]+' ชิ้น');});
 }
 let drag=null,lastDrag=0,lastDragButton=null;
 function pick(i,b){if(!run||busy||pending||run.complete||Date.now()>=deadline||picks[i]>=9)return;picks[i]++;const wrong=picks[i]>run.order[i];tone(!wrong);if(wrong)customerComplaint(i);animate(b,'hit');basketEffect(i,b);render();}
@@ -35,25 +39,19 @@ function customerComplaint(i){
  if(Date.now()<customerUntil)return;customerUntil=Date.now()+1200;
  const otherSize=products.findIndex((p,j)=>j!==i&&p[1]===products[i][1]&&run.order[j]>0);
  const lines=[3,7].includes(i)?[
-  'หมดอายุแล้ว ยังจะหยิบมาอีก! ดูวันที่บ้างดิ!',
-  'ของหมดอายุจะเอามาให้กินเนี่ยนะ? เอากลับไป!',
-  'นี่จะขายของหรือจะให้ท้องเสีย? ดูวันหมดอายุด้วย!',
-  'โห ของเสียยังกล้าหยิบมาอีกเหรอ!'
+  'ชิ้นนี้หมดอายุแล้ว ลองเลือกของสดแทนนะ',
+  'เช็กวันหมดอายุอีกนิด แล้วหยิบชิ้นใหม่กัน!'
  ]:run.order[i]===0&&otherSize>=0?[
-  'สั่ง '+products[otherSize][2]+' ไม่ใช่ '+products[i][2]+'! ดูให้ดีดิ!',
-  'ชื่อเหมือนกันแล้วไง น้ำหนักมันคนละอัน!',
-  'อ่านให้จบดิ น้ำหนักก็เขียนอยู่เนี่ย!'
+  'ขนาดยังไม่ตรงนะ ออเดอร์นี้ต้องการ '+products[otherSize][2],
+  'ชื่อเหมือนกัน แต่ขนาดต่างกัน เช็กป้ายอีกนิด!'
  ]:run.order[i]===0?[
-  'โคตรมั่วเลย! สั่งอย่างนึง หยิบมาอีกอย่าง!',
-  'อ่านออเดอร์บ้างมั้ย หรือหลับตาหยิบ?',
-  'พี่ไม่ได้สั่งอันนี้! จะให้บอกอีกกี่รอบ?',
-  'รีบแล้วหยิบมั่วแบบนี้ ก็ต้องมาทำใหม่อยู่ดี!'
+  'ชิ้นนี้ยังไม่ได้สั่งนะ แตะในตะกร้าเพื่อนำออกได้เลย',
+  'ลองดูรายการด้านบน แล้วเลือกใหม่อีกนิดนะ'
  ]:[
-  'สั่งแค่นี้ หยิบเกินมาทำไม ใครจะจ่าย?',
-  'นี่นับเลขเป็นปะ? หยิบเกินแล้ว!',
-  'ไม่ได้สั่งขนาดนั้น! เอาที่เกินออกเลย!'
+  'หยิบเกินแล้วนิดนึง แตะในตะกร้าเพื่อลดจำนวนได้',
+  'ใกล้ครบแล้ว! เช็กจำนวนตามออเดอร์อีกครั้งนะ'
  ];
- const bubble=$('customerBubble');bubble.textContent='ลูกค้า: '+lines[complaintCount++%lines.length];bubble.hidden=false;clearTimeout(customerTimer);animate(bubble,'customer-pop');customerTimer=setTimeout(()=>bubble.hidden=true,3000);
+ const bubble=$('customerBubble');bubble.textContent='💡 '+lines[complaintCount++%lines.length];bubble.hidden=false;clearTimeout(customerTimer);animate(bubble,'customer-pop');customerTimer=setTimeout(()=>bubble.hidden=true,3000);
 }
 let comboTimer;
 function showCombo(combo,points,speed){
@@ -75,7 +73,7 @@ function basketEffect(i,source){
 function clearDrag(){if(drag?.ghost)drag.ghost.remove();$('dropBasket').classList.remove('drop-ready');drag=null;}
 products.forEach(([emoji,name,variant],i)=>{
  const b=document.createElement('button');b.className='product'+([3,7].includes(i)?' expired':'');
- const icon=productArt(i,'product-art');const label=document.createElement('span');label.textContent=name;const detail=document.createElement('small');detail.textContent=variant;b.append(icon,label,detail);b.setAttribute('aria-label','หยิบ'+name+' '+variant);
+ const icon=productArt(i,'product-art');const label=document.createElement('span');label.textContent=name;label.className='product-name';const detail=document.createElement('small');detail.textContent=variant;const badge=document.createElement('span');badge.className='pick-badge';badge.setAttribute('aria-hidden','true');b.append(icon,label,detail,badge);b.setAttribute('aria-label','หยิบ'+name+' '+variant);
  b.onclick=()=>{if(b!==lastDragButton||Date.now()-lastDrag>400)pick(i,b);};
  b.onpointerdown=e=>{if(b.disabled||!run||run.complete||e.button!==0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY,i,b};b.setPointerCapture?.(e.pointerId);};
  b.onpointermove=e=>{if(!drag||drag.id!==e.pointerId)return;if(!drag.ghost&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>8){const ghost=document.createElement('div');ghost.className='drag-ghost';const preview=productArt(i,'drag-preview');ghost.append(preview,document.createTextNode(name+' '+variant));document.body.append(ghost);drag.ghost=ghost;$('dropBasket').classList.add('drop-ready');}if(drag.ghost){e.preventDefault();drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px';}};
@@ -84,7 +82,7 @@ products.forEach(([emoji,name,variant],i)=>{
 });
 async function load(){
  $('start').disabled=true;$('retryLogin').hidden=true;
- try{const r=await fetch('../api/session',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const s=await r.json();if(!s.user){$('identity').textContent='ตั้งชื่อแล้วเข้าห้องรอได้เลย ไม่ต้องเชื่อมต่อ LINE';$('guestForm').hidden=false;$('start').hidden=true;$('guestName').focus();return;}$('guestForm').hidden=true;$('start').hidden=false;csrf=s.csrf;$('identity').textContent='ผู้เล่น: '+(s.user.name||s.user.lineName);$('start').textContent='กำลังเข้าห้องรอ…';$('lobbyTops').hidden=false;connectLobby();await board();}catch{$('identity').textContent='โหลดบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง';$('retryLogin').hidden=false;}
+ try{const r=await fetch('../api/session',{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const s=await r.json();if(!s.user){$('identity').textContent='ตั้งชื่อแล้วเข้าห้องรอได้เลย ไม่ต้องเชื่อมต่อ LINE';$('guestForm').hidden=false;$('start').hidden=true;$('guestName').focus({preventScroll:true});return;}$('guestForm').hidden=true;$('start').hidden=false;csrf=s.csrf;$('identity').textContent='ผู้เล่น: '+(s.user.name||s.user.lineName);$('start').textContent='กำลังเข้าห้องรอ…';$('lobbyTops').hidden=false;connectLobby();await board();}catch{$('identity').textContent='โหลดบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง';$('retryLogin').hidden=false;}
 }
 $('retryLogin').onclick=load;
 $('guestForm').onsubmit=async e=>{
