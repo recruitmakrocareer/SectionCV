@@ -622,3 +622,15 @@ test('direct taps are authoritative, idempotent, preserve partial progress and f
  f.tick(100);r=(await send(product)).body;assert.equal(r.orders,4);assert.deepEqual(r.picks,Array(8).fill(0));
  f.tick(90000);const late=(await send(r.order.findIndex(Boolean))).body;assert.equal(late.complete,true);assert.equal(late.score,r.score);assert.equal(late.orders,4);
 });
+
+test('batched rapid taps validate each touch and replay atomically without crossing orders',async t=>{
+ const f=await fixture(t);let r=(await f.request('/api/orders/start',{rulesVersion:3,roundId:f.roundId})).body;
+ for(let n=0;n<3;n++){f.tick(1000);r=(await f.request('/api/orders/tap',{id:r.id,seq:r.seq+1,product:r.order.findIndex(Boolean)})).body;}
+ const product=r.order.findIndex(Boolean),score=r.score;
+ f.tick(1000);const event={id:r.id,seq:r.seq+1,products:[7,product,product,7]};
+ const responses=await Promise.all([f.request('/api/orders/tap',event),f.request('/api/orders/tap',event)]);
+ assert.ok(responses.every(x=>x.status===200));assert.deepEqual(responses[0].body,responses[1].body);r=responses[0].body;
+ assert.equal(r.orders,4);assert.equal(r.errors,1,'extra touches after completion never enter the next order');assert.equal(r.combo,1);assert.ok(r.score<score+300);assert.deepEqual(r.picks,Array(8).fill(0));
+ assert.equal((await f.request('/api/orders/tap',{...event,products:[product,7,product]})).status,409,'a different batch cannot replay the same sequence');
+ assert.equal((await f.request('/api/orders/tap',{id:r.id,seq:r.seq+1,products:Array(13).fill(product)})).status,400);
+});
