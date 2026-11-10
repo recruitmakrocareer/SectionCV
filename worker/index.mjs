@@ -258,6 +258,23 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           const csv = '\ufeff' + [keys, ...rows.map((row) => keys.map((key) => row[key]))].map((row) => row.map(cell).join(',')).join('\r\n');
           return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="makro-players.csv"' } });
         }
+        if (request.method === 'POST' && url.pathname === '/api/guest') {
+          // Play without LINE: a display name creates a guest player and session.
+          if (!origin || url.origin !== origin || request.headers.get('Origin') !== origin) fail('คำขอไม่ถูกต้อง กรุณาโหลดหน้าใหม่', 403);
+          const existing = await session(false);
+          if (existing) return json({ user: userView(existing), csrf: existing.csrf });
+          const data = await readBody(request);
+          const name = typeof data.name === 'string' ? data.name.trim().replace(/\s+/g, ' ') : '';
+          if (name.length < 2 || name.length > 30 || /[\p{Cc}\p{Cf}]/u.test(name)) fail('กรุณาตั้งชื่อ 2–30 ตัวอักษร');
+          const id = crypto.randomUUID(), token = random(), csrf = random();
+          const [, , , saved] = await db.batch([
+            stmt('INSERT INTO users(id,line_sub,line_name,name,created_at) VALUES(?,?,?,?,?)', id, `guest:${id}`, name, name, now()),
+            stmt('DELETE FROM sessions WHERE expires_at<=?', now()),
+            stmt('INSERT INTO sessions VALUES(?,?,?,?)', await hash(token), id, csrf, now() + SESSION_MS),
+            stmt('SELECT * FROM users WHERE id=?', id)
+          ]);
+          return json({ user: userView(saved.results[0]), csrf }, 201, { 'Set-Cookie': cookie('mk_session', token, SESSION_MS / 1000) });
+        }
         if (request.method === 'POST' && url.pathname.startsWith('/api/')) {
           const user = await session();
           if (!origin || url.origin !== origin || request.headers.get('Origin') !== origin || !equal(request.headers.get('X-CSRF-Token'), user.csrf)) fail('คำขอไม่ถูกต้อง กรุณาโหลดหน้าใหม่', 403);
