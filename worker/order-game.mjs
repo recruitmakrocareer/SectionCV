@@ -13,8 +13,11 @@ export const dayOf=ms=>new Date(ms+7*3600000).toISOString().slice(0,10);
 export function orderFor(day,index){
  let seed=2166136261;for(const c of `${day}:${index}:makro-v2`)seed=Math.imul(seed^c.charCodeAt(0),16777619)>>>0;
  const next=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed;};
- const amounts=Array(8).fill(0),count=Math.min(4,2+Math.floor(index/5));
- let available=[0,1,2,4,5,6];for(let n=0;n<count;n++){const i=next()%available.length;amounts[available.splice(i,1)[0]]=1+(next()%(index<5?2:3));}return amounts;
+ // Each three completed orders adds one step; quantities never drop.
+ const stage=Math.min(11,Math.floor(index/3));
+ const count=1+Math.floor(stage/3),quantity=1+stage%3;
+ const amounts=Array(8).fill(0);
+ let available=[0,1,2,4,5,6];for(let n=0;n<count;n++){const i=next()%available.length;amounts[available.splice(i,1)[0]]=n===0?quantity:3;}return amounts;
 }
 const view=(r,now)=>({id:r.id,day:r.day,deadline:r.deadline,remaining:Math.max(0,r.deadline-now),speedTotal:r.speed_total,orderElapsed:Math.max(0,now-r.order_started),score:r.score,errors:r.errors,orders:r.orders,combo:r.combo,best:r.best,seq:r.seq,complete:!!r.complete,order:orderFor(r.day,r.orders)});
 export async function orderAPI(db,user,path,data,now){
