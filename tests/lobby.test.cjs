@@ -102,3 +102,15 @@ test('only admitted players can open a run while the round is live', async () =>
   assert.equal((await lobby.fetch(new Request(`https://lobby/round?id=${id}&user=z`))).status, 403);
   assert.equal((await lobby.fetch(new Request('https://lobby/round?id=other&user=a'))).status, 403);
 });
+
+test('the admin status snapshot lists the room without user ids', async () => {
+  const { lobby, join, ready } = await room();
+  const a = join('a'); join('b');
+  await ready(a);
+  const status = await (await lobby.fetch(new Request('https://lobby/status'))).json();
+  assert.equal(status.phase, 'waiting');
+  assert.equal(status.count, 2);
+  assert.equal(status.readyCount, 1);
+  assert.deepEqual(status.players, [{ name: 'a', ready: true }, { name: 'b', ready: false }]);
+  assert.ok(!JSON.stringify(status).includes('userId'));
+});

@@ -32,6 +32,18 @@ export class LobbyRoom {
         round.players.includes(url.searchParams.get('user')) && this.now() < round.endAt;
       return allowed ? Response.json({ id: round.id, startAt: round.startAt, endAt: round.endAt }) : Response.json({ error: 'not-in-round' }, { status: 403 });
     }
+    if (url.pathname === '/status') {
+      // Read-only room snapshot for the admin live board. No user ids leave here.
+      const players = this.sockets().map((ws) => ws.deserializeAttachment());
+      const { phase, round, readyDeadline, lastRound } = this.state;
+      return Response.json({
+        phase, readyDeadline, count: players.length, readyCount: players.filter((player) => player.ready).length,
+        players: players.slice(0, MAX_LISTED).map((player) => ({ name: player.name, ready: player.ready })),
+        round: round && { id: round.id, startAt: round.startAt, endAt: round.endAt, count: round.players.length },
+        lastRound: lastRound && { roundId: lastRound.roundId, failed: lastRound.failed,
+          top: lastRound.top.map(({ userId, ...row }, index) => ({ ...row, rank: index + 1 })) }
+      });
+    }
     if (url.pathname !== '/ws' || request.headers.get('Upgrade') !== 'websocket') return new Response('Not found', { status: 404 });
     const userId = request.headers.get('X-Lobby-User');
     const name = decodeURIComponent(request.headers.get('X-Lobby-Name') || '');

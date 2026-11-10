@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Makro — คะแนนสด Order Rush</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--red:#db1628;--red-dark:#a30b24;--ink:#1f2937;--muted:#6b7280;--line:#eadfe0;--soft:#fff7f7;--gold:#f6b300;--ok:#14803c;--bg:#fff}
+*{box-sizing:border-box}
+body{margin:0;font-family:Kanit,system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+[hidden]{display:none!important}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:var(--red);color:#fff}
+.brand{font-size:1.6rem;font-weight:800;letter-spacing:-.02em}.brand span{color:#ffd400}
+header h1{margin:0;font-size:1.05rem;font-weight:600}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
+.login{max-width:380px;margin:48px auto;display:grid;gap:12px;padding:24px;border:2px solid var(--line);border-radius:18px}
+.login h2{margin:0}
+.login input{font:inherit;font-size:16px;padding:12px 14px;border:2px solid #d9c5c7;border-radius:12px}
+.login input:focus{outline:3px solid #ffb5b9;border-color:var(--red)}
+button{font:inherit;cursor:pointer;border-radius:12px}
+.primary{border:0;background:var(--red);color:#fff;font-weight:700;padding:12px 18px}
+.ghost{border:2px solid rgba(255,255,255,.6);background:transparent;color:#fff;padding:6px 12px}
+.error{color:var(--red-dark);min-height:1.2em;margin:0}
+.status{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:18px 20px;border-radius:18px;background:var(--soft);border:2px solid var(--red)}
+.status h2{margin:0;font-size:1.3rem}
+.status p{margin:4px 0 0;color:var(--muted)}
+.clock{font-size:clamp(2rem,6vw,3.4rem);font-weight:800;color:var(--red);font-variant-numeric:tabular-nums;line-height:1}
+.leader{margin:18px 0;padding:18px 20px;border-radius:18px;background:linear-gradient(135deg,#fff3c4,#ffe28a);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.leader .crown{font-size:2.4rem}
+.leader small{display:block;color:#7a5b00;font-weight:600}
+.leader strong{font-size:clamp(1.4rem,4vw,2.2rem);overflow-wrap:anywhere}
+.leader .points{margin-left:auto;font-size:clamp(1.6rem,5vw,2.6rem);font-weight:800;font-variant-numeric:tabular-nums}
+.table-wrap{overflow-x:auto;border:2px solid var(--line);border-radius:18px}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line)}
+th{background:#fafafa;font-size:.9rem;color:var(--muted);font-weight:600}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.rank{font-weight:800;color:var(--red);width:3.5em}
+td.name{font-weight:600;overflow-wrap:anywhere}
+td.score{font-size:1.15rem;font-weight:800}
+tr.first td{background:#fff8dc}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.85rem;background:#e8f6ee;color:var(--ok)}
+.badge.done{background:#f1f1f1;color:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:10px 4px 0;color:var(--muted);font-size:.9rem}
+.waiting{margin-top:18px}
+.waiting h3{margin:0 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:0;margin:0;list-style:none}
+.chips li{padding:6px 12px;border-radius:999px;background:#f3f4f6;overflow-wrap:anywhere}
+.chips li.ready{background:#e8f6ee;color:var(--ok);font-weight:600}
+@media(max-width:600px){header{padding:12px 16px}.status{grid-template-columns:1fr}.leader .points{margin-left:0}}
+</style>
+</head>
+<body>
+<header><div class="brand">makro<span>.</span></div><h1>คะแนนสด Order Rush</h1><button id="logout" class="ghost" type="button" hidden>ออกจากระบบ</button></header>
+<main>
+<form id="login" class="login">
+<h2>สำหรับผู้ดูแลกิจกรรม</h2>
+<label for="password">รหัสผ่าน admin</label>
+<input id="password" type="password" autocomplete="current-password" required>
+<button class="primary" type="submit">ดูคะแนนสด</button>
+<p id="loginError" class="error" role="alert"></p>
+</form>
+<section id="board" hidden aria-live="polite">
+<div class="status"><div><h2 id="phase">กำลังโหลด…</h2><p id="phaseNote"></p></div><div id="clock" class="clock" role="timer"></div></div>
+<div id="leader" class="leader" hidden><span class="crown" aria-hidden="true">👑</span><div><small>กำลังนำ</small><strong id="leaderName"></strong></div><span id="leaderScore" class="points"></span></div>
+<div class="table-wrap"><table><thead><tr><th>อันดับ</th><th>ผู้เล่น</th><th class="num">คะแนน</th><th class="num">ออเดอร์สำเร็จ</th><th class="num">ส่งผิด</th><th class="num">คอมโบ</th><th>สถานะ</th></tr></thead><tbody id="rows"></tbody></table><p id="empty" class="empty" hidden></p></div>
+<div class="meta"><span id="updated"></span><span id="conn" role="status"></span></div>
+<section class="waiting"><h3 id="waitingTitle">ห้องรอ</h3><ul id="waiting" class="chips"></ul></section>
+</section>
+</main>
+<script src="live.js?v=1"></script>
+</body>
+</html>

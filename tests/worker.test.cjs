@@ -17,7 +17,7 @@ let mf, DB, createWorker, bundle;
 before(async () => {
   ({ createWorker } = await import('../worker/index.mjs'));
   bundle = (await build({ entryPoints: [join(root, 'worker/index.mjs')], bundle: true, write: false, format: 'esm', platform: 'browser' })).outputFiles[0].text;
-  mf = new Miniflare({ cf: false, modules: true, script: bundle, compatibilityDate: '2026-07-30', d1Databases: ['DB'], durableObjects: { LOBBY: 'LobbyRoom' }, bindings: { APP_ORIGIN: origin, LINE_CHANNEL_ID: '2011516015' } });
+  mf = new Miniflare({ cf: false, modules: true, script: bundle, compatibilityDate: '2026-07-30', d1Databases: ['DB'], durableObjects: { LOBBY: 'LobbyRoom' }, bindings: { APP_ORIGIN: origin, LINE_CHANNEL_ID: '2011516015', ADMIN_PASSWORD: 'live-board-test' } });
   DB = await mf.getD1Database('DB');
   await DB.batch(schema.split(';').map((s) => s.trim()).filter(Boolean).map((s) => DB.prepare(s)));
 });
@@ -503,6 +503,12 @@ test('lobby runs in workerd: all ready starts one shared round and only its play
  assert.equal(roundA.roundId,roundB.roundId);assert.equal(roundA.startAt,roundB.startAt);assert.equal(roundA.you.inRound,true);
  const run=await start(a,roundA.roundId);assert.equal(run.status,200);const body=await run.json();assert.ok(body.id.startsWith(`round:${roundA.roundId}:`));assert.equal(body.deadline,roundA.endAt);
  assert.equal((await start(outsider,roundA.roundId)).status,409);
+ const live=key=>mf.dispatchFetch(origin+'/api/admin/live',{headers:key===undefined?{}:{'X-Admin-Key':key}});
+ assert.equal((await live()).status,401);assert.equal((await live('wrong')).status,401);
+ const board=await (await live('live-board-test')).json();
+ assert.equal(board.live,true);assert.equal(board.roundId,roundA.roundId);assert.equal(board.round.count,2);assert.equal(board.scores.length,1);
+ assert.deepEqual(board.scores[0],{name:'ผู้เล่นทดสอบ',score:0,orders:0,errors:0,combo:0,best:0,finished:false,rank:1});
+ assert.ok(!JSON.stringify(board).includes('0812345678'),'contact numbers never reach the live board');assert.ok(!JSON.stringify(board).includes(a.id),'user ids never reach the live board');
  first.ws.close();second.ws.close();
  await DB.prepare('DELETE FROM order_runs_v3 WHERE user_id IN (?,?)').bind(a.id,b.id).run();
 });
@@ -566,4 +572,26 @@ test('order rush shows a name form when not signed in and continues into the lob
  assert.equal(sentName,'ผู้เล่นใหม่');assert.equal(w.document.getElementById('guestForm').hidden,true);assert.equal(w.document.getElementById('start').hidden,false);
  assert.match(w.document.getElementById('identity').textContent,/ผู้เล่นใหม่/);
  await wait(()=>w.document.getElementById('myRank').textContent!=='');
+});
+test('live board needs the admin password secret and renders scores as text', async t => {
+ const f=await fixture(t);
+ const res=await f.worker.fetch(new Request(origin+'/api/admin/live',{headers:{'X-Admin-Key':'anything'}}),f.env);
+ assert.equal(res.status,503,'no password configured means no access at all');
+ const dom=new JSDOM(readFileSync(join(root,'live.html'),'utf8'),{url:origin+'/live.html',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
+ const now=Date.now();let sentKey=null,status=401;
+ w.fetch=async(url,options)=>{sentKey=options.headers['X-Admin-Key'];if(status!==200)return Response.json({error:'รหัสผ่านไม่ถูกต้อง'},{status});
+  return Response.json({serverNow:now,live:true,roundId:'r',phase:'round',readyDeadline:null,count:3,readyCount:0,players:[{name:'คนรอ',ready:false}],round:{id:'r',startAt:now-10000,endAt:now+80000,count:2},lastRound:null,
+   scores:[{rank:1,name:'<img src=x onerror=alert(1)>',score:540,orders:3,errors:1,combo:2,best:2,finished:false},{rank:2,name:'สอง',score:100,orders:1,errors:0,combo:1,best:1,finished:true}]});};
+ const wait=async check=>{for(let i=0;i<100;i++){if(check())return;await new Promise(r=>setTimeout(r,10));}assert.fail('live board timed out');};
+ w.eval(readFileSync(join(root,'live.js'),'utf8'));
+ assert.equal(w.document.getElementById('board').hidden,true);
+ w.document.getElementById('password').value='bad';w.document.getElementById('login').dispatchEvent(new w.Event('submit',{cancelable:true}));
+ await wait(()=>w.document.getElementById('loginError').textContent!=='');assert.equal(sentKey,'bad');assert.equal(w.document.getElementById('board').hidden,true);
+ status=200;w.document.getElementById('password').value='good';w.document.getElementById('login').dispatchEvent(new w.Event('submit',{cancelable:true}));
+ await wait(()=>w.document.querySelectorAll('#rows tr').length===2);
+ assert.equal(sentKey,'good');assert.equal(w.document.querySelector('#rows img'),null,'player names are never parsed as HTML');
+ assert.equal(w.document.getElementById('leaderName').textContent,'<img src=x onerror=alert(1)>');assert.equal(w.document.getElementById('leaderScore').textContent,'540 คะแนน');
+ assert.equal(w.document.getElementById('phase').textContent,'กำลังแข่งอยู่');assert.match(w.document.getElementById('clock').textContent,/^01:(19|20)$/);
+ assert.match(w.document.querySelectorAll('#rows tr')[1].textContent,/จบแล้ว/);assert.match(w.document.getElementById('waitingTitle').textContent,/3 คน/);
+ w.document.getElementById('logout').click();assert.equal(w.document.getElementById('board').hidden,true);assert.equal(w.sessionStorage.getItem('mk_admin_key'),null);
 });
