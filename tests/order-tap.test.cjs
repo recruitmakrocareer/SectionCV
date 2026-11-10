@@ -32,3 +32,29 @@ test('products stay put during partial taps and retries, then shuffle once after
  assert.equal(run.orders,1);assert.ok(positions().every((id,i)=>id!==before[i]),'every product moves after the entire order is complete');
  assert.equal(w.document.querySelector('[data-product="0"] image').getAttribute('href'),'art/products-cute.png');
 });
+
+test('rapid taps update immediately, batch behind a slow response, and retry without double scoring',async t=>{
+ const dom=new JSDOM(fs.readFileSync(path.join(__dirname,'../order-game/index.html'),'utf8'),{url:'https://game.test/order-game/',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;w.AbortSignal=AbortSignal;w.scrollTo=()=>{};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
+ let run={id:'fast',day:'2026-11-10',remaining:90000,deadline:Date.now()+90000,score:0,combo:0,orders:0,best:0,errors:0,seq:0,complete:false,order:[3,0,1,0,0,0,0,0],picks:Array(8).fill(0)};
+ const requests=[],replies=[];
+ w.fetch=async(url,options={})=>{
+  if(url.includes('api/session'))return Response.json({user:{name:'Test'},csrf:'test'});
+  if(url.includes('/start'))return Response.json(run);
+  if(url.includes('/tap')){
+   const data=JSON.parse(options.body);requests.push(data);
+   if(data.seq>run.seq){run.seq=data.seq;for(const i of data.products??[data.product]){run.picks[i]++;if(run.order.every((n,j)=>n===run.picks[j])){run.orders++;run.score+=100;run.picks=Array(8).fill(0);break;}}run.accepted=true;}
+   const snapshot=structuredClone(run);return new Promise((resolve,reject)=>replies.push({ok:()=>resolve(Response.json(snapshot)),fail:()=>reject(Error('lost response'))}));
+  }
+  return Response.json({entries:[],total:0,page:1,day:run.day});
+ };
+ let socket;w.WebSocket=class{constructor(){socket=this;this.readyState=1;}send(){}};
+ const wait=async check=>{for(let i=0;i<100;i++){if(check())return;await new Promise(r=>setTimeout(r,5));}assert.fail('timed out');};
+ w.eval(fs.readFileSync(path.join(__dirname,'../order-game/game.js'),'utf8'));await wait(()=>socket?.onmessage);
+ const now=Date.now();socket.onmessage({data:JSON.stringify({serverNow:now,phase:'round',count:2,readyCount:2,players:[],roundId:'fast-round',startAt:now,endAt:now+90000,you:{ready:true,inRound:true},lastRound:null})});await wait(()=>w.document.body.classList.contains('playing'));
+ const button=i=>w.document.querySelector(`[data-product="${i}"]`),positions=()=>[...w.document.querySelectorAll('.product')].map(b=>b.dataset.product),before=positions();
+ button(0).click();assert.match(w.document.querySelector('.order-quantity').textContent,/1\/3/);assert.equal(button(0).disabled,false,'network request does not disable further partial taps');
+ button(0).click();button(0).click();button(2).click();assert.equal(requests.length,1,'only one request is in flight');assert.equal(button(0).disabled,true,'completed local order waits for confirmation');assert.deepEqual(positions(),before);
+ replies[0].ok();await wait(()=>requests.length===2);assert.deepEqual(requests[1].products,[0,0,2]);assert.deepEqual(positions(),before,'no shuffle until server confirms the last batch');
+ replies[1].fail();await wait(()=>!w.document.getElementById('retryTap').hidden);w.document.getElementById('retryTap').click();await wait(()=>requests.length===3);assert.deepEqual(requests[1],requests[2]);
+ replies[2].ok();await wait(()=>w.document.getElementById('score').textContent==='100');assert.equal(run.orders,1);assert.ok(positions().every((id,i)=>id!==before[i]));
+});

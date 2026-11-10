@@ -26,8 +26,9 @@ const view=(r,now)=>({picks:tapState(r)?.picks||Array(8).fill(0),accepted:tapSta
 export async function orderAPI(db,user,path,data,now){
  const q=(s,...v)=>db.prepare(s).bind(...v);
  // Idempotent bootstrap allows the existing dashboard deployment command to work.
- await db.prepare(schema).run();
- await db.prepare('CREATE INDEX IF NOT EXISTS idx_order_v3_day ON order_runs_v3(day,complete,user_id)').run();
+ if(path==='/api/orders/start'||path==='/api/orders/board'){
+  await db.batch([db.prepare(schema),db.prepare('CREATE INDEX IF NOT EXISTS idx_order_v3_day ON order_runs_v3(day,complete,user_id)')]);
+ }
  if(path==='/api/orders/board'){
   const day=data?.day||dayOf(now);if(!/^\d{4}-\d{2}-\d{2}$/.test(day))bad('วันที่ไม่ถูกต้อง');
   const page=Math.max(1,Math.min(10000,Number(data?.page)||1));
@@ -57,24 +58,27 @@ export async function orderAPI(db,user,path,data,now){
   await q('UPDATE order_runs_v3 SET complete=1 WHERE id=?',r.id).run();return view({...r,complete:1},now);
  }
  if(path==='/api/orders/tap'){
-  if(!Number.isInteger(data.product)||data.product<0||data.product>7||!Number.isSafeInteger(data.seq))bad('ข้อมูลสินค้าไม่ถูกต้อง');
-  const previous=tapState(r);
-  if(data.seq===r.seq&&previous?.product===data.product)return view(r,now);
+  const products=data.products??[data.product];
+  if(!Array.isArray(products)||products.length<1||products.length>12||products.some(i=>!Number.isInteger(i)||i<0||i>7)||!Number.isSafeInteger(data.seq))bad('ข้อมูลสินค้าไม่ถูกต้อง');
+  const previous=tapState(r),signature=JSON.stringify(products);
+  const matches=row=>{const state=tapState(row);return state&&JSON.stringify(state.products??[state.product])===signature;};
+  if(data.seq===r.seq&&matches(r))return view(r,now);
   if(data.seq!==r.seq+1)bad('ข้อมูลเปลี่ยน กรุณาโหลดเกมใหม่',409);
   if(now<r.started)bad('ยังไม่ถึงเวลาเริ่ม',409);
   if(r.complete||now>=r.deadline){await q('UPDATE order_runs_v3 SET complete=1 WHERE id=?',r.id).run();return view({...r,complete:1},now);}
   const picks=[...(previous?.picks||Array(8).fill(0))],order=orderFor(r.day,r.orders);
-  const accepted=picks[data.product]<order[data.product];
-  if(accepted)picks[data.product]++;
-  const done=accepted&&order.every((n,i)=>n===picks[i]);
-  const expired=[3,7].includes(data.product),penalty=expired?100:60;
-  const end=r.deadline-(accepted?0:expired?8000:5000);
-  const combo=done?r.combo+1:accepted?r.combo:0;
-  const speed=done?Math.max(0,200-Math.floor(Math.max(0,now-r.order_started)/100)):0;
-  const score=done?r.score+100+Math.min(5,combo-1)*20+speed:accepted?r.score:Math.max(0,r.score-penalty);
-  const payload=JSON.stringify({mode:'tap',product:data.product,accepted,picks:done?Array(8).fill(0):picks});
-  const updated=await q(`UPDATE order_runs_v3 SET score=?,errors=?,orders=?,combo=?,best=?,seq=?,payload=?,updated=?,deadline=?,complete=?,order_started=?,speed_total=? WHERE id=? AND seq=? AND complete=0 RETURNING *`,score,r.errors+(accepted?0:1),r.orders+(done?1:0),combo,Math.max(r.best,combo),data.seq,payload,now,end,end<=now?1:0,done?now:r.order_started,r.speed_total+speed,r.id,r.seq).first();
-  if(!updated){const current=await q('SELECT * FROM order_runs_v3 WHERE id=?',r.id).first();if(current.seq===data.seq&&tapState(current)?.product===data.product)return view(current,now);bad('ข้อมูลเปลี่ยน กรุณาลองอีกครั้ง',409);}
+  let score=r.score,errors=r.errors,combo=r.combo,end=r.deadline,speed=0,done=false,accepted=false;
+  // Queued touches belong to this order only; never apply leftovers to a new order.
+  for(const product of products){
+   if(done||end<=now)break;
+   accepted=picks[product]<order[product];
+   if(accepted){picks[product]++;done=order.every((n,i)=>n===picks[i]);}
+   else {const expired=[3,7].includes(product);errors++;combo=0;score=Math.max(0,score-(expired?100:60));end-=expired?8000:5000;}
+   if(done){combo++;speed=Math.max(0,200-Math.floor(Math.max(0,now-r.order_started)/100));score+=100+Math.min(5,combo-1)*20+speed;}
+  }
+  const payload=JSON.stringify({mode:'tap',product:products[0],products,accepted,picks:done?Array(8).fill(0):picks});
+  const updated=await q(`UPDATE order_runs_v3 SET score=?,errors=?,orders=?,combo=?,best=?,seq=?,payload=?,updated=?,deadline=?,complete=?,order_started=?,speed_total=? WHERE id=? AND seq=? AND complete=0 RETURNING *`,score,errors,r.orders+(done?1:0),combo,Math.max(r.best,combo),data.seq,payload,now,end,end<=now?1:0,done?now:r.order_started,r.speed_total+speed,r.id,r.seq).first();
+  if(!updated){const current=await q('SELECT * FROM order_runs_v3 WHERE id=?',r.id).first();if(current.seq===data.seq&&matches(current))return view(current,now);bad('ข้อมูลเปลี่ยน กรุณาลองอีกครั้ง',409);}
   return view(updated,now);
  }
  if(path!=='/api/orders/submit')bad('ไม่พบรายการ',404);
