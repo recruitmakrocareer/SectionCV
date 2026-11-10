@@ -471,11 +471,13 @@ test('order rush client plays through D1, retries a lost submit and displays con
  w.eval(readFileSync(join(root,'order-game/game.js'),'utf8'));await wait(()=>socket?.onmessage);assert.equal(socket.url,'wss://game.test/api/lobby/ws');state();await wait(()=>!w.document.getElementById('start').disabled);
  assert.equal(w.document.querySelectorAll('#lobbyPlayers li').length,2);w.document.getElementById('start').click();assert.deepEqual(socket.sent,[{type:'ready',ready:true}]);assert.equal(w.document.getElementById('play').hidden,true,'readying up alone must not start the game');
  state({phase:'round',roundId:f.roundId,startAt:f.now(),endAt:f.now()+90000,you:{ready:true,inRound:true}});await wait(()=>!w.document.getElementById('play').hidden);
- const tap=async index=>{f.tick(1000);w.document.querySelector(`[data-product="${index}"]`).click();await wait(()=>inflight===0);};
- const order=orderFor(dayOf(f.now()),0);await tap(order.findIndex(Boolean));
+ const tap=async index=>{w.document.querySelector(`[data-product="${index}"]`).click();await wait(()=>inflight===0);};
+ const order=orderFor(dayOf(f.now()),0),first=order.findIndex(Boolean);f.tick(1000);await tap(first);
  await wait(()=>w.document.getElementById('feedback').textContent.includes('ลองยืนยัน'));
- assert.equal(w.document.getElementById('retryTap').hidden,false);w.document.getElementById('retryTap').click();await wait(()=>w.document.getElementById('score').textContent==='290');
- const second=orderFor(dayOf(f.now()),1);await tap(second.findIndex(Boolean));await wait(()=>w.document.getElementById('score').textContent==='600');
+ assert.equal(w.document.getElementById('retryTap').hidden,false);w.document.getElementById('retryTap').click();await wait(()=>inflight===0);
+ for(let i=0;i<order.length;i++)for(let k=0;k<order[i]-(i===first?1:0);k++)await tap(i);
+ await wait(()=>w.document.getElementById('score').textContent==='290');
+ const second=orderFor(dayOf(f.now()),1);f.tick(1000);for(let i=0;i<second.length;i++)for(let k=0;k<second[i];k++)await tap(i);await wait(()=>w.document.getElementById('score').textContent==='600');
  assert.equal(w.document.getElementById('comboBurst').hidden,false);assert.match(w.document.getElementById('comboBurst').textContent,/COMBO ×2/);
  f.tick(90000);onTick();await wait(()=>w.document.getElementById('saveStatus').textContent.includes('อันดับดีที่สุด'));
  assert.equal(w.document.getElementById('result').open,true);assert.equal(w.document.getElementById('resultScore').textContent,'600');assert.equal(w.document.querySelectorAll('.rank-row.mine').length,1);assert.equal(w.document.getElementById('again').disabled,false);
@@ -619,24 +621,25 @@ test('direct taps are authoritative, idempotent, preserve partial progress and f
  assert.equal((await other.request('/api/orders/tap',{id:r.id,seq:1,product:0})).status,404);
  assert.equal((await send(8)).status,400);
  for(let n=0;n<3;n++){
-  f.tick(1000);const event={id:r.id,seq:r.seq+1,product:r.order.findIndex(Boolean)};
+  f.tick(1000);const event={id:r.id,seq:r.seq+1,products:r.order.flatMap((n,i)=>Array(n).fill(i))};
   const [a,b]=await Promise.all([f.request('/api/orders/tap',event),f.request('/api/orders/tap',event)]);
   assert.equal(a.status,200);assert.equal(b.status,200);assert.equal(a.body.orders,n+1);assert.equal(b.body.score,a.body.score);r=a.body;
  }
- const product=r.order.findIndex(Boolean);assert.equal(r.order[product],2);
+ const product=r.order.findIndex(n=>n===2);assert.equal(r.order[product],2);
  f.tick(1000);r=(await send(product)).body;assert.equal(r.orders,3);assert.equal(r.picks[product],1);assert.equal(r.accepted,true);
  const resumed=(await f.request('/api/orders/start',{rulesVersion:3,roundId:f.roundId})).body;assert.deepEqual(resumed.picks,r.picks);
  const score=r.score,deadline=r.deadline;f.tick(100);r=(await send(7)).body;
  assert.equal(r.accepted,false);assert.equal(r.score,score-100);assert.equal(r.deadline,deadline-8000);assert.equal(r.picks[product],1);assert.equal(r.combo,0);
- f.tick(100);r=(await send(product)).body;assert.equal(r.orders,4);assert.deepEqual(r.picks,Array(8).fill(0));
+ f.tick(100);r=(await send(product)).body;assert.equal(r.orders,3);
+ const remaining=r.order.findIndex((n,i)=>n>r.picks[i]);f.tick(100);r=(await send(remaining)).body;assert.equal(r.orders,4);assert.deepEqual(r.picks,Array(8).fill(0));
  f.tick(90000);const late=(await send(r.order.findIndex(Boolean))).body;assert.equal(late.complete,true);assert.equal(late.score,r.score);assert.equal(late.orders,4);
 });
 
 test('batched rapid taps validate each touch and replay atomically without crossing orders',async t=>{
  const f=await fixture(t);let r=(await f.request('/api/orders/start',{rulesVersion:3,roundId:f.roundId})).body;
- for(let n=0;n<3;n++){f.tick(1000);r=(await f.request('/api/orders/tap',{id:r.id,seq:r.seq+1,product:r.order.findIndex(Boolean)})).body;}
+ for(let n=0;n<3;n++){f.tick(1000);r=(await f.request('/api/orders/tap',{id:r.id,seq:r.seq+1,products:r.order.flatMap((count,i)=>Array(count).fill(i))})).body;}
  const product=r.order.findIndex(Boolean),score=r.score;
- f.tick(1000);const event={id:r.id,seq:r.seq+1,products:[7,product,product,7]};
+ f.tick(1000);const event={id:r.id,seq:r.seq+1,products:[7,...r.order.flatMap((n,i)=>Array(n).fill(i)),7]};
  const responses=await Promise.all([f.request('/api/orders/tap',event),f.request('/api/orders/tap',event)]);
  assert.ok(responses.every(x=>x.status===200));assert.deepEqual(responses[0].body,responses[1].body);r=responses[0].body;
  assert.equal(r.orders,4);assert.equal(r.errors,1,'extra touches after completion never enter the next order');assert.equal(r.combo,1);assert.ok(r.score<score+300);assert.deepEqual(r.picks,Array(8).fill(0));
