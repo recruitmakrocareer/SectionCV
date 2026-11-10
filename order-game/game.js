@@ -145,7 +145,7 @@ async function joinRound(state){
  lobbyNotice='เข้ารอบนี้ไม่สำเร็จ กรุณารอรอบถัดไป';renderLobbyClock();
 }
 function beginPlay(state){
- orderClock=Math.max(fromServer(state.startAt),Date.now()-(run.orderElapsed||0));$('newRound').hidden=true;$('welcome').hidden=true;$('play').hidden=false;document.body.classList.add('playing');if($('result').open)$('result').close();$('feedback').textContent='แตะสินค้าให้ตรงออเดอร์ · แตะถูกแล้วสินค้าจะสลับที่';busy=false;shuffleProducts();render();clearInterval(timer);timer=setInterval(tick,100);tick();window.scrollTo(0,0);
+ orderClock=Math.max(fromServer(state.startAt),Date.now()-(run.orderElapsed||0));$('newRound').hidden=true;$('welcome').hidden=true;$('play').hidden=false;document.body.classList.add('playing');if($('result').open)$('result').close();$('feedback').textContent='แตะสินค้าให้ตรงออเดอร์ · ครบออร์เดอร์แล้วสินค้าจะสลับที่';busy=false;shuffleProducts();render();clearInterval(timer);timer=setInterval(tick,100);tick();window.scrollTo(0,0);
 }
 function backToLobby(){
  if($('result').open)$('result').close();run=null;picks.fill(0);$('play').hidden=true;$('newRound').hidden=true;$('welcome').hidden=false;document.body.classList.remove('playing');renderLobby();window.scrollTo(0,0);
@@ -156,7 +156,7 @@ async function submit(){
  if(!run||busy||run.complete||!pending)return;if(Date.now()>=deadline){finish();return;}busy=true;render();
  try{
   const previous=run,product=pending.product;run=await api('tap',pending);pending=null;picks=[...run.picks];deadline=fromServer(run.deadline);orderClock=Date.now()-(run.orderElapsed||0);
-  if(run.accepted){shuffleProducts();$('feedback').textContent=run.orders>previous.orders?'ครบออเดอร์! +'+(run.score-previous.score)+' คะแนน 🎉':'ถูกต้อง! หาสินค้าชิ้นถัดไป';tone(true);if(run.orders>previous.orders){animate($('score'),'score-pop');if(run.combo>1)showCombo(run.combo,run.score-previous.score,(run.speedTotal||0)-(previous.speedTotal||0));}}
+  if(run.accepted){if(run.orders>previous.orders)shuffleProducts();$('feedback').textContent=run.orders>previous.orders?'ครบออเดอร์! +'+(run.score-previous.score)+' คะแนน 🎉':'ถูกต้อง! หาสินค้าชิ้นถัดไป';tone(true);if(run.orders>previous.orders){animate($('score'),'score-pop');if(run.combo>1)showCombo(run.combo,run.score-previous.score,(run.speedTotal||0)-(previous.speedTotal||0));}}
   else if(!run.complete){tone(false);customerComplaint(product);$('feedback').textContent=[3,7].includes(product)?'หมดอายุ! −100 คะแนน · −8 วินาที':'ไม่ตรงออเดอร์หรือครบแล้ว! −60 คะแนน · −5 วินาที';}
  }catch(e){$('feedback').textContent=e.message+' · แตะลองยืนยันอีกครั้ง';}
  finally{busy=false;render();if(Date.now()>=deadline||run.complete)finish();}

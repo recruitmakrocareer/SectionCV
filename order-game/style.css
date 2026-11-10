@@ -2186,3 +2186,12 @@ body.playing #retryTap { background: #ffda4a; color: #202a46; font-size: 18px; m
   body.playing .ticket { position: sticky; top: 0; z-index: 5; }
 }
 body.playing .tap-status { position: sticky; bottom: 0; z-index: 6; padding: 8px 12px; border-radius: 12px; background: #fff5e4f5; border: 1px solid #e5b98b; }
+
+/* Larger product artwork; keep the same positions throughout an order. */
+body.playing .truck-shop { min-height: 880px; }
+body.playing .truck-shop .product-art { min-height: 110px; }
+@media (max-width: 700px) {
+  body.playing .truck-shop { min-height: 0; }
+  body.playing .truck-shop .shelf { min-height: 760px; grid-template-rows: repeat(4,190px); }
+  body.playing .truck-shop .product-art { min-height: 120px; }
+}
