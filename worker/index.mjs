@@ -218,6 +218,25 @@ export function createWorker({ now = Date.now, lineFetch = fetch } = {}) {
           return lobby().fetch('https://lobby/ws', { headers: { Upgrade: 'websocket', 'X-Lobby-User': user.id,
             'X-Lobby-Name': encodeURIComponent(String(user.name || user.line_name).slice(0, 80)) } });
         }
+        if (request.method === 'GET' && url.pathname === '/api/admin/live') {
+          // Password set as the ADMIN_PASSWORD secret in Cloudflare; compared as
+          // fixed-length hashes so timing does not reveal how much matched.
+          if (!env.ADMIN_PASSWORD) fail('ยังไม่ได้ตั้งรหัสผ่าน admin ใน Cloudflare', 503);
+          const key = request.headers.get('X-Admin-Key') || '';
+          if (!equal(await hash(key), await hash(env.ADMIN_PASSWORD))) fail('รหัสผ่านไม่ถูกต้อง', 401);
+          const status = await (await lobby().fetch('https://lobby/status')).json();
+          const roundId = status.round?.id || status.lastRound?.roundId || null;
+          let scores = [];
+          if (roundId) {
+            try {
+              ({ results: scores } = await stmt(`SELECT COALESCE(NULLIF(u.name,''),u.line_name) AS name,r.score,r.orders,r.errors,r.combo,r.best,
+                (r.complete=1 OR r.deadline<=?) AS finished FROM order_runs_v3 r JOIN users u ON u.id=r.user_id WHERE r.id LIKE ?
+                ORDER BY r.score DESC,r.errors ASC,r.deadline ASC,r.id ASC LIMIT 200`, now(), `round:${roundId}:%`).all());
+            } catch { scores = []; }
+          }
+          return json({ serverNow: now(), live: !!status.round, roundId, ...status,
+            scores: scores.map((row, index) => ({ ...row, finished: !!row.finished, rank: index + 1 })) });
+        }
         if (request.method === 'GET' && url.pathname === '/api/orders/board') return json(await orderAPI(db, await session(), url.pathname, Object.fromEntries(url.searchParams), now()));
         if (request.method === 'GET' && url.pathname === '/api/leaderboard') {
           if (url.searchParams.get('rulesVersion') === '2') {
