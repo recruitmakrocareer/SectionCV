@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 async function room() {
-  const { LobbyRoom, READY_MS, COUNTDOWN_MS, ROUND_MS, GRACE_MS } = await import('../worker/lobby-room.mjs');
+  const { LobbyRoom, COUNTDOWN_MS, ROUND_MS, GRACE_MS } = await import('../worker/lobby-room.mjs');
   const sockets = [];
   const clock = { now: 1000 };
   const ctx = {
@@ -25,7 +25,7 @@ async function room() {
   };
   const ready = (ws, value = true) => lobby.webSocketMessage(ws, JSON.stringify({ type: 'ready', ready: value }));
   const last = (ws) => ws.messages.at(-1);
-  return { lobby, join, ready, last, clock, sockets, READY_MS, COUNTDOWN_MS, ROUND_MS, GRACE_MS };
+  return { lobby, join, ready, last, clock, sockets, COUNTDOWN_MS, ROUND_MS, GRACE_MS };
 }
 
 test('the round starts for everyone only once all players are ready', async () => {
@@ -41,27 +41,26 @@ test('the round starts for everyone only once all players are ready', async () =
   assert.equal(last(b).you.inRound, true);
 });
 
-test('after 60 seconds the round leaves out players who are not ready', async () => {
-  const { lobby, join, ready, last, clock, READY_MS } = await room();
-  const a = join('a'), b = join('b');
-  await ready(a);
-  assert.equal(clock.alarm, clock.now + READY_MS);
-  clock.now += READY_MS;
-  await lobby.alarm();
-  assert.equal(last(a).phase, 'round');
-  assert.equal(last(a).you.inRound, true);
-  assert.equal(last(b).you.inRound, false);
+test('waiting never starts a subset even after an old ready timer fires', async () => {
+ const {lobby,join,ready,last,clock}=await room();
+ const a=join('a'),b=join('b');await ready(a);
+ assert.equal(last(a).readyDeadline,null);
+ lobby.state.readyDeadline=clock.now+60000;clock.alarm=lobby.state.readyDeadline;
+ clock.now+=120000;await lobby.alarm();
+ assert.equal(last(a).phase,'waiting');assert.equal(last(b).phase,'waiting');
+ assert.equal(last(a).readyDeadline,null);assert.equal(clock.alarm,null);
+ await ready(b);assert.equal(last(a).phase,'round');assert.equal(last(b).you.inRound,true);
 });
 
-test('a lone player does not start instantly, so others have time to join', async () => {
+test('a lone ready player waits without a timer', async () => {
   const { join, ready, last } = await room();
   const a = join('a');
   await ready(a);
   assert.equal(last(a).phase, 'waiting');
-  assert.ok(last(a).readyDeadline);
+  assert.equal(last(a).readyDeadline,null);
 });
 
-test('cancelling the last ready player stops the ready timer', async () => {
+test('cancelling readiness keeps the room waiting', async () => {
   const { join, ready, last, clock } = await room();
   const a = join('a');
   join('b');

@@ -1,6 +1,5 @@
 // One shared Order Rush room. A single Durable Object serializes every ready
 // click and owns the round clock, so all players receive the same start time.
-export const READY_MS = 60000;
 export const COUNTDOWN_MS = 5000;
 export const ROUND_MS = 90000;
 export const GRACE_MS = 3000;
@@ -80,15 +79,10 @@ export class LobbyRoom {
     const players = this.sockets(excluded).map((ws) => ws.deserializeAttachment());
     const ready = players.filter((player) => player.ready);
     if (players.length >= 2 && ready.length === players.length) return this.startRound(ready);
-    if (!ready.length) {
-      if (this.state.readyDeadline !== null) {
-        this.state.readyDeadline = null;
-        await this.ctx.storage.deleteAlarm();
-        await this.save();
-      }
-    } else if (this.state.readyDeadline === null) {
-      this.state.readyDeadline = this.now() + READY_MS;
-      await this.ctx.storage.setAlarm(this.state.readyDeadline);
+    // Clear timers persisted by older deployments; waiting never starts a subset.
+    await this.ctx.storage.deleteAlarm();
+    if (this.state.readyDeadline !== null) {
+      this.state.readyDeadline = null;
       await this.save();
     }
   }
@@ -105,10 +99,8 @@ export class LobbyRoom {
 
   async alarm() {
     const now = this.now();
-    if (this.state.phase === 'waiting' && this.state.readyDeadline !== null && now >= this.state.readyDeadline) {
-      const ready = this.sockets().map((ws) => ws.deserializeAttachment()).filter((player) => player.ready);
-      if (ready.length) await this.startRound(ready);
-      else { this.state.readyDeadline = null; await this.save(); }
+    if (this.state.phase === 'waiting') {
+      await this.evaluate();
     } else if (this.state.phase === 'round' && now >= this.state.round.endAt + GRACE_MS) {
       await this.finishRound();
     }
