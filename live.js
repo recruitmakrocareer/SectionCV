@@ -9,6 +9,8 @@
   let pollTimer = null;
   let clockTimer = null;
   let inFlight = false;
+  let starting = false;
+  let mutation = 0;
   try { key = sessionStorage.getItem(STORE) || ''; } catch {}
 
   const remember = (value) => { try { value ? sessionStorage.setItem(STORE, value) : sessionStorage.removeItem(STORE); } catch {} };
@@ -41,6 +43,7 @@
   async function poll() {
     if (inFlight) return;
     inFlight = true;
+    const version = mutation;
     try {
       const response = await fetch('api/admin/live', { headers: { 'X-Admin-Key': key }, cache: 'no-store', credentials: 'same-origin' });
       let value = {};
@@ -51,11 +54,13 @@
         return;
       }
       if (!response.ok) throw new Error(value.error || 'โหลดไม่สำเร็จ');
+      if (version !== mutation) return;
       offset = value.serverNow - Date.now();
       data = value;
       render();
       $('conn').textContent = '';
     } catch {
+      $('startGame').disabled = true;
       $('conn').textContent = 'การเชื่อมต่อสะดุด กำลังลองใหม่…';
     } finally {
       inFlight = false;
@@ -84,6 +89,7 @@
       phase = 'ยังไม่มีรอบที่แข่ง';
       note = 'รอผู้เล่นอย่างน้อย 2 คน และกดเตรียมพร้อมครบทุกคน';
     }
+    if (data.canStart && !data.live) { phase = 'ผู้เล่นพร้อมครบแล้ว'; note = 'กดเริ่มเกมเพื่อเริ่มนับถอยหลังพร้อมกัน'; }
     $('phase').textContent = phase;
     $('phaseNote').textContent = note;
     $('clock').textContent = clock;
@@ -91,6 +97,8 @@
 
   function render() {
     renderClock();
+    $('startGame').hidden = !data.canStart || data.live;
+    $('startGame').disabled = starting || !data.canStart || data.live;
     const rows = data.scores || [];
     const leader = rows[0];
     $('leader').hidden = !leader;
@@ -125,6 +133,24 @@
     }
     $('updated').textContent = `อัปเดตล่าสุด ${new Date().toLocaleTimeString('th-TH')}`;
   }
+
+  $('startGame').addEventListener('click', async () => {
+    if (starting || !data?.canStart || data.live) return;
+    starting = true;
+    mutation++;
+    $('startGame').disabled = true;
+    $('startStatus').textContent = 'กำลังเริ่มเกม…';
+    try {
+      const response = await fetch('api/admin/start', { method: 'POST', headers: { 'X-Admin-Key': key }, credentials: 'same-origin', cache: 'no-store' });
+      const value = await response.json();
+      if (response.status === 401 || response.status === 503) { remember(''); showLogin(value.error); return; }
+      if (!response.ok) throw new Error(value.error || 'เริ่มเกมไม่สำเร็จ');
+      data.canStart = false;
+      $('startGame').hidden = true;
+      $('startStatus').textContent = 'เริ่มนับถอยหลังแล้ว';
+    } catch (error) { $('startStatus').textContent = error.message; }
+    finally { starting = false; await poll(); }
+  });
 
   $('login').addEventListener('submit', (event) => {
     event.preventDefault();

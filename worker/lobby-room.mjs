@@ -25,6 +25,15 @@ export class LobbyRoom {
 
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === '/start' && request.method === 'POST') {
+      const players = this.sockets().map((ws) => ws.deserializeAttachment());
+      if (this.state.phase !== 'waiting' || players.length < 2 || !players.every((player) => player.ready)) {
+        return Response.json({ error: 'ต้องมีผู้เล่นอย่างน้อย 2 คน และทุกคนต้องกดพร้อมก่อนเริ่ม' }, { status: 409 });
+      }
+      await this.startRound(players);
+      this.broadcast();
+      return Response.json({ ok: true, roundId: this.state.round.id });
+    }
     if (url.pathname === '/round') {
       const round = this.state.round;
       const allowed = this.state.phase === 'round' && round?.id === url.searchParams.get('id') &&
@@ -36,6 +45,7 @@ export class LobbyRoom {
       const players = this.sockets().map((ws) => ws.deserializeAttachment());
       const { phase, round, readyDeadline, lastRound } = this.state;
       return Response.json({
+        canStart: phase === 'waiting' && players.length >= 2 && players.every((player) => player.ready),
         phase, readyDeadline, count: players.length, readyCount: players.filter((player) => player.ready).length,
         players: players.slice(0, MAX_LISTED).map((player) => ({ name: player.name, ready: player.ready })),
         round: round && { id: round.id, startAt: round.startAt, endAt: round.endAt, count: round.players.length },
@@ -76,9 +86,6 @@ export class LobbyRoom {
 
   async evaluate(excluded) {
     if (this.state.phase !== 'waiting') return;
-    const players = this.sockets(excluded).map((ws) => ws.deserializeAttachment());
-    const ready = players.filter((player) => player.ready);
-    if (players.length >= 2 && ready.length === players.length) return this.startRound(ready);
     // Clear timers persisted by older deployments; waiting never starts a subset.
     await this.ctx.storage.deleteAlarm();
     if (this.state.readyDeadline !== null) {
