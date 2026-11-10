@@ -130,3 +130,14 @@ test('admin start rechecks cancelled readiness, new arrivals and disconnected pl
  assert.equal((await start()).status,200);
  const round=lobby.state.round;assert.deepEqual(round.players,['a','c']);
 });
+
+
+test('admin can start one ready player but cannot start an empty or unready room',async()=>{
+ const {lobby,join,ready,start,last}=await room();
+ const status=async()=>await (await lobby.fetch(new Request('https://lobby/status'))).json();
+ assert.equal((await status()).canStart,false);assert.equal((await start()).status,409);
+ const a=join('solo');assert.equal((await status()).canStart,false);assert.equal((await start()).status,409);
+ await ready(a);assert.equal(last(a).phase,'waiting');assert.equal((await status()).canStart,true);
+ assert.equal((await start()).status,200);assert.equal(last(a).phase,'round');assert.equal(last(a).you.inRound,true);
+ assert.deepEqual(lobby.state.round.players,['solo']);
+});
