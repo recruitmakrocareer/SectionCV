@@ -149,7 +149,7 @@
       }
       waiting.append(li);
     }
-    $('updated').textContent = `อัปเดตล่าสุด ${new Date().toLocaleTimeString('th-TH')}`;
+    $('updated').textContent = `อัปเดตล่าสุด ${new Date().toLocaleTimeString(window.MAKRO_I18N?.locale || 'th-TH')}`;
   }
 
   async function removePlayer(player) {

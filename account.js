@@ -123,7 +123,7 @@
       $('#personalCompleted').textContent = `${data.completedRuns} ครั้ง`;
       $('#personalSummary').hidden = false;
       $('#personalHistoryRows').replaceChildren();
-      const dateFormat = new Intl.DateTimeFormat('th-TH', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Bangkok' });
+      const dateFormat = new Intl.DateTimeFormat(window.MAKRO_I18N?.locale || 'th-TH', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Bangkok' });
       for (const run of data.recentRuns) {
         const row = document.createElement('tr');
         const outcome = run.status === 'complete' ? `จบ 3 ด่าน · ${run.foundCount} / 15 จุด · บันทึกแล้ว${run.rulesVersion === 1 ? ' (กติกาเดิม)' : ''}`
