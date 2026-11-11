@@ -9,9 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=20260914-logos">
+  <script src="i18n.js?v=20261111-lang1"></script>
 </head>
 <body class="choosing-game">
   <section id="gameLobby" class="game-lobby" aria-label="เลือกเกมแม็คโคร">
+  <div class="lobby-lang"><div data-lang-switch></div></div>
   <div class="game-options logo-options">
   <a class="game-option game-emblem order-emblem" href="order-game/" aria-label="เล่นเกมหยิบให้ไว จัดให้ครบ"><span class="emblem-brand">makro</span><img src="order-game/art/milk.svg" alt=""><strong>หยิบให้ไว<br>จัดให้ครบ!</strong><span class="emblem-tag">ORDER RUSH</span></a>
   <a class="game-option game-emblem memory-emblem" href="memory-game/" aria-label="เล่นเกมจับคู่"><span class="emblem-brand">makro</span><span class="emblem-pair"><img src="order-game/art/apple.svg" alt=""><img src="order-game/art/apple.svg" alt=""></span><strong>เกมจับคู่</strong><span class="emblem-tag">MATCH & PLAY</span></a>
@@ -25,6 +27,7 @@
       <a href="#leaderboard">อันดับผู้เล่น</a>
       <a href="#personalStats" data-view-stats>สถิติของฉัน</a>
     </nav>
+    <div data-lang-switch></div>
     <button class="sound-button" id="soundToggle" aria-label="เปิดหรือปิดเสียง" aria-pressed="false">
       <span id="soundIcon">♪</span><span class="sound-label">เสียง</span>
     </button>
